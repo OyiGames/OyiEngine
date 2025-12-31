@@ -1,0 +1,12 @@
+[submodule "Engine/Packages/mimalloc"]
+	path = Engine/Packages/mimalloc
+	url = https://github.com/microsoft/mimalloc.git
+	branch = main
+[submodule "Engine/Packages/benchmark"]
+	path = Engine/Packages/benchmark
+	url = https://github.com/google/benchmark.git
+	branch = main
+[submodule "Engine/Packages/googletest"]
+	path = Engine/Packages/googletest
+	url = https://github.com/google/googletest.git
+	branch = main
