@@ -14,3 +14,11 @@
 	path = Engine/Packages/gtl
 	url = https://github.com/greg7mdp/gtl.git
 	branch = main
+[submodule "Engine/Packages/VulkanMemoryAllocator"]
+	path = Engine/Packages/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+	branch = master
+[submodule "Engine/Packages/SDL"]
+	path = Engine/Packages/SDL
+	url = https://github.com/libsdl-org/SDL.git
+	branch = main

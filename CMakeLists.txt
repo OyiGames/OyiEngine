@@ -26,12 +26,25 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 include(CMake/OutputDirectories.cmake)
+include(cmake/CopySpecifiedFilesToBuild.cmake)
+
+option(OYI_GRAPHIC_VULKAN "Enable Vulkan backend" ON)
 
 option(ENGINE_USE_BENCHMARK "Enable Google Benchmark" ON)
 option(ENGINE_USE_GTEST "Enable GoogleTest" ON)
+option(ENGINE_USE_SDL "Enable SDL3" ON)
+option(ENGINE_USE_VMA "Enable VMA" ON)
 
 include(CMake/Release/mimalloc_release.cmake)
 setup_output_directories(mimalloc-static)
+
+find_package(Vulkan REQUIRED)
+message(STATUS "==> FindVulkan.cmake path: ${_FINDVULKAN_CMAKE_FILE}")
+message("find vulkan : ${Vulkan_FOUND}")
+if(${Vulkan_FOUND})
+    message("vulkan libs : ${Vulkan_LIBRARY}")
+    copy_specified_files_to_build(FILES ${Vulkan_LIBRARY})
+endif()
 
 if(ENGINE_USE_BENCHMARK)
     set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "Do not treat warnings as errors" FORCE)
@@ -50,9 +63,46 @@ if (ENGINE_USE_GTEST)
     setup_output_directories(gtest_lib)
 endif()
 
+if (ENGINE_USE_SDL)
+    include(CMake/Release/sdl_release.cmake)
+    setup_output_directories(SDL3-shared)
+endif()
+
+if (OYI_GRAPHIC_VULKAN)
+if (ENGINE_USE_VMA)
+    include(CMake/Release/vma_release.cmake)
+    setup_output_directories(VMA)
+endif()
+endif()
+
 # if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 # else()
 # endif()
 
-add_subdirectory(Engine/Tests/Malloc)
-add_subdirectory(Engine/Tests/GTL)
+add_subdirectory(Engine/Benchmarks/Malloc)
+add_subdirectory(Engine/Benchmarks/GTL)
+add_subdirectory(Engine/Modules/Graphic)
+add_subdirectory(Engine/Tests/Graphic/RDG)
+# add_subdirectory(Engine/Tests/Graphic/Vulkan)
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+set_property(TARGET 
+    benchmark
+    gtest
+    gtest_main
+    mimalloc-static 
+    PROPERTY FOLDER "Packages"
+)
+
+set_property(TARGET 
+    BM_GTL
+    BM_Malloc 
+    PROPERTY FOLDER "Benchmarks"
+)
+
+set_property(TARGET 
+    TEST_RenderGraph
+    # TEST_Vulkan
+    PROPERTY FOLDER "Tests"
+)

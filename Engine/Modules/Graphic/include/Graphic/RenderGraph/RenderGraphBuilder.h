@@ -5,11 +5,12 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <Graphic/API.h>
 #include <Graphic/RenderGraph/RenderGraphIR.h>
 
 namespace Oyi::Graphic
 {
-class RenderGraphBuilder
+class OYI_GRAPHIC_API RenderGraphBuilder
 {
 public:
     RenderGraphBuilder() = default;

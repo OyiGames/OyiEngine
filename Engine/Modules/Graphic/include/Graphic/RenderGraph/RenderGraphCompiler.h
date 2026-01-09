@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
+#include <Graphic/API.h>
 #include <Graphic/RenderGraph/RenderGraphIR.h>
 
 namespace Oyi::Graphic
@@ -12,7 +12,7 @@ using RGNodeID = uint32_t; // strictly 0..passCount-1
 
 class RenderGraphBuilder;
 
-struct RGCompiledPass
+struct OYI_GRAPHIC_API RGCompiledPass
 {
     RGNodeID node = 0;             // internal node id
     uint32_t passIndex = 0;         // original builder pass index (debug/stable handle)
@@ -27,7 +27,7 @@ struct RGResourceLifetime
     uint32_t end   = 0;
 };
 
-struct RGCompiledGraph
+struct OYI_GRAPHIC_API RGCompiledGraph
 {
     // FIFO topological order (stable, predictable).
     std::vector<RGNodeID> topoOrder;
@@ -57,7 +57,7 @@ struct RGCompiledGraph
     }
 };
 
-class RenderGraphCompiler
+class OYI_GRAPHIC_API RenderGraphCompiler
 {
 public:
     void Compile(const RenderGraphBuilder& builder);
