@@ -83,7 +83,7 @@ add_subdirectory(Engine/Benchmarks/Malloc)
 add_subdirectory(Engine/Benchmarks/GTL)
 add_subdirectory(Engine/Modules/Graphic)
 add_subdirectory(Engine/Tests/Graphic/RDG)
-# add_subdirectory(Engine/Tests/Graphic/Vulkan)
+add_subdirectory(Engine/Tests/Graphic/Vulkan)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -103,6 +103,6 @@ set_property(TARGET
 
 set_property(TARGET 
     TEST_RenderGraph
-    # TEST_Vulkan
+    TEST_Vulkan
     PROPERTY FOLDER "Tests"
 )

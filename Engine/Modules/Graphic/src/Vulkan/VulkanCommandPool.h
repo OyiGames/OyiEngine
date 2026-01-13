@@ -1,9 +1,10 @@
 #pragma once
 #include <vulkan/vulkan.h>
+#include <Graphic/API.h>
 
 namespace Oyi::Graphic
 {
-    class VulkanCommandPool
+    class OYI_GRAPHIC_API VulkanCommandPool
     {
     public:
         VulkanCommandPool() = default;

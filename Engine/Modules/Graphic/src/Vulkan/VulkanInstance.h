@@ -1,10 +1,11 @@
 #pragma once
 #include <vector>
 #include <vulkan/vulkan.h>
+#include <Graphic/API.h>
 
 namespace Oyi::Graphic
 {
-    class VulkanInstance
+    class OYI_GRAPHIC_API VulkanInstance
     {
     public:
         VulkanInstance();

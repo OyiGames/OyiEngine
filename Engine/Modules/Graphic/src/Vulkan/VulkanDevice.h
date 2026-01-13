@@ -1,11 +1,12 @@
 #pragma once
 #include <vulkan/vulkan.h>
+#include <Graphic/API.h>
 
 namespace Oyi::Graphic
 {
     class VulkanSurface;
 
-    class VulkanDevice
+    class OYI_GRAPHIC_API VulkanDevice
     {
     public:
         VulkanDevice();

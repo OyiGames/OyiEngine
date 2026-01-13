@@ -12,7 +12,7 @@ target_include_directories(TEST_Vulkan PRIVATE
 target_link_libraries(TEST_Vulkan PRIVATE
     OyiGraphic
     Vulkan::Vulkan
-    VMA::VMA
+    OyiVMA
     SDL3::SDL3
     gtest_main
 )

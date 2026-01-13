@@ -1,9 +1,10 @@
 #pragma once
 #include <vulkan/vulkan.h>
+#include <Graphic/API.h>
 
 namespace Oyi::Graphic
 {
-    class VulkanDebug
+    class OYI_GRAPHIC_API VulkanDebug
     {
     public:
         static void fillCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& info);

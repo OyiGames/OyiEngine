@@ -30,11 +30,12 @@ protected:
     // Called once before all tests in this fixture.
     static void SetUpTestSuite()
     {
-        if (SDL_Init(SDL_INIT_VIDEO) != 0)
+        if (!SDL_Init(SDL_INIT_VIDEO))
         {
             // SDL initialization failed.
             // Individual tests will skip accordingly.
             s_sdlInitOk = false;
+            fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
             return;
         }
         s_sdlInitOk = true;

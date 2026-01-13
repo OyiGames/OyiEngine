@@ -13,7 +13,7 @@ namespace Oyi::Graphic
     class VulkanQueue;
     class VulkanCommandPool;
 
-    class VulkanContext final : public RHIContext
+    class OYI_GRAPHIC_API VulkanContext final : public RHIContext
     {
     public:
         VulkanContext();

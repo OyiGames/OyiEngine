@@ -1,12 +1,13 @@
 #pragma once
 #include <vector>
 #include <vulkan/vulkan.h>
+#include <Graphic/API.h>
 
 struct SDL_Window;
 
 namespace Oyi::Graphic
 {
-    class VulkanSurface
+    class OYI_GRAPHIC_API VulkanSurface
     {
     public:
         explicit VulkanSurface(SDL_Window* window);

@@ -66,8 +66,6 @@ namespace Oyi::Graphic
             return;
         }
 
-        // Create debug messenger (optional)
-        VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
         if (DefaultEnableValidation)
         {
             VulkanDebug::create(instanceObj->handle(), debugMessenger);
