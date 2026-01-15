@@ -1,3 +1,4 @@
+#include <fmt/base.h>
 #include <cstdio>
 #include <vulkan/vulkan.h>
 #include "VulkanCommandPool.h"
@@ -17,7 +18,7 @@ namespace Oyi::Graphic
         VkResult r = vkCreateCommandPool(device, &ci, nullptr, &pool);
         if (r != VK_SUCCESS)
         {
-            std::fprintf(stderr, "[Vulkan] vkCreateCommandPool failed: %d\n", int(r));
+            fmt::print(stderr, "[OyiVulkan] vkCreateCommandPool failed: {}\n", int(r));
             pool = VK_NULL_HANDLE;
         }
     }

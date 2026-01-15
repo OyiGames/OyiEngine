@@ -30,14 +30,22 @@ include(cmake/CopySpecifiedFilesToBuild.cmake)
 
 option(OYI_GRAPHIC_VULKAN "Enable Vulkan backend" ON)
 
-option(ENGINE_USE_BENCHMARK "Enable Google Benchmark" ON)
-option(ENGINE_USE_GTEST "Enable GoogleTest" ON)
-option(ENGINE_USE_SDL "Enable SDL3" ON)
-option(ENGINE_USE_VMA "Enable VMA" ON)
+include(CMake/Release/fmt_release.cmake)
+setup_output_directories(fmt)
 
 include(CMake/Release/mimalloc_release.cmake)
 setup_output_directories(mimalloc-static)
 
+include(CMake/Release/benchmark_release.cmake)
+setup_output_directories(benchmark)
+
+include(CMake/Release/gtest_release.cmake)
+setup_output_directories(gtest_lib)
+
+include(CMake/Release/sdl_release.cmake)
+setup_output_directories(SDL3-shared)
+
+if (OYI_GRAPHIC_VULKAN)
 find_package(Vulkan REQUIRED)
 message(STATUS "==> FindVulkan.cmake path: ${_FINDVULKAN_CMAKE_FILE}")
 message("find vulkan : ${Vulkan_FOUND}")
@@ -45,34 +53,8 @@ if(${Vulkan_FOUND})
     message("vulkan libs : ${Vulkan_LIBRARY}")
     copy_specified_files_to_build(FILES ${Vulkan_LIBRARY})
 endif()
-
-if(ENGINE_USE_BENCHMARK)
-    set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "Do not treat warnings as errors" FORCE)
-    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "Disable building unit tests for benchmark" FORCE)
-    set(BENCHMARK_USE_BUNDLED_GTEST OFF CACHE BOOL "Do not use bundled gtest" FORCE)
-    add_subdirectory(Engine/Packages/benchmark EXCLUDE_FROM_ALL)
-    set_target_properties(benchmark PROPERTIES
-        MAP_IMPORTED_CONFIG_DEBUG RELEASE
-        MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE
-    )
-    setup_output_directories(benchmark)
-endif()
-
-if (ENGINE_USE_GTEST)
-    include(CMake/Release/gtest_release.cmake)
-    setup_output_directories(gtest_lib)
-endif()
-
-if (ENGINE_USE_SDL)
-    include(CMake/Release/sdl_release.cmake)
-    setup_output_directories(SDL3-shared)
-endif()
-
-if (OYI_GRAPHIC_VULKAN)
-if (ENGINE_USE_VMA)
-    include(CMake/Release/vma_release.cmake)
-    setup_output_directories(VMA)
-endif()
+include(CMake/Release/vma_release.cmake)
+setup_output_directories(VMA)
 endif()
 
 # if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -88,16 +70,20 @@ add_subdirectory(Engine/Tests/Graphic/Vulkan)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set_property(TARGET 
+    fmt    
     benchmark
     gtest
     gtest_main
-    mimalloc-static 
+    mimalloc-static
+    SDL3-shared
+    SDL_uclibc
+    OyiVMA
     PROPERTY FOLDER "Packages"
 )
 
 set_property(TARGET 
     BM_GTL
-    BM_Malloc 
+    BM_Malloc
     PROPERTY FOLDER "Benchmarks"
 )
 

@@ -5,17 +5,7 @@
 # ---- location ----
 set(OYI_SDL_DIR ${CMAKE_SOURCE_DIR}/Engine/Packages/SDL)
 
-if (NOT EXISTS ${OYI_SDL_DIR}/CMakeLists.txt)
-    message(FATAL_ERROR
-        "SDL3 submodule not found at:\n"
-        "  ${OYI_SDL_DIR}\n"
-        "Did you forget to run:\n"
-        "  git submodule update --init --recursive ?"
-    )
-endif()
-
 # ---- build form ----
-# Prefer static build for engine release
 set(SDL_SHARED   ON CACHE BOOL "" FORCE)
 set(SDL_STATIC   OFF  CACHE BOOL "" FORCE)
 

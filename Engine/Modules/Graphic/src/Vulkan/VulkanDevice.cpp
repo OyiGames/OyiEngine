@@ -1,6 +1,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdio>
+#include <fmt/base.h>
 #include <vulkan/vulkan.h>
 #include "VulkanDevice.h"
 #include "VulkanSurface.h"
@@ -125,7 +126,7 @@ namespace Oyi::Graphic
 
         if (best == VK_NULL_HANDLE)
         {
-            std::fprintf(stderr, "[Vulkan] No suitable physical device found.\n");
+            fmt::print(stderr, "[OyiVulkan] No suitable physical device found.\n");
             return;
         }
 
@@ -171,7 +172,7 @@ namespace Oyi::Graphic
         VkResult r = vkCreateDevice(physicalDevice, &ci, nullptr, &device);
         if (r != VK_SUCCESS)
         {
-            std::fprintf(stderr, "[Vulkan] vkCreateDevice failed: %d\n", int(r));
+            fmt::print(stderr, "[OyiVulkan] vkCreateDevice failed: {}\n", int(r));
             device = VK_NULL_HANDLE;
             physicalDevice = VK_NULL_HANDLE;
             return;

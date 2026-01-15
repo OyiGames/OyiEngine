@@ -1,10 +1,9 @@
 #include <cstdio>
+#include <fmt/base.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 #include "VulkanSurface.h"
-
-
 
 namespace Oyi::Graphic
 {
@@ -37,7 +36,7 @@ namespace Oyi::Graphic
 
         if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface))
         {
-            std::fprintf(stderr, "[Vulkan] SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError());
+            fmt::print(stderr, "[OyiVulkan] SDL_Vulkan_CreateSurface failed: {}\n", SDL_GetError());
             surface = VK_NULL_HANDLE;
         }
 

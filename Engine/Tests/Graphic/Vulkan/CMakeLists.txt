@@ -17,4 +17,6 @@ target_link_libraries(TEST_Vulkan PRIVATE
     gtest_main
 )
 
+target_link_libraries(TEST_Vulkan PRIVATE fmt::fmt)
+
 add_test(NAME TEST_Vulkan COMMAND TEST_Vulkan)

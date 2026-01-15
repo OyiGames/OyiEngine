@@ -1,12 +1,14 @@
 project(OyiGraphic)
 
+if (OYI_GRAPHIC_VULKAN)
 add_library(OyiVMA STATIC
-    "src/Vulkan/VmaImpl.cpp"
+    "src/VMA/VmaImpl.cpp"
 )
 target_include_directories(OyiVMA PUBLIC
     ${CMAKE_SOURCE_DIR}/Engine/Packages/VulkanMemoryAllocator/include
 )
 target_link_libraries(OyiVMA PUBLIC Vulkan::Vulkan)
+endif()
 
 file(GLOB_RECURSE OYI_GRAPHIC_SRC CONFIGURE_DEPENDS
     "include/Graphic/RenderGraph/*.h"
@@ -36,3 +38,4 @@ target_link_libraries(OyiGraphic PRIVATE
 endif()
 
 target_link_libraries(OyiGraphic PRIVATE SDL3::SDL3)
+target_link_libraries(OyiGraphic PRIVATE fmt::fmt)

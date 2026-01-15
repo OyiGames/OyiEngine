@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstring>
+#include <fmt/base.h>
 #include <vulkan/vulkan.h>
 #include "VulkanDebug.h"
 
@@ -16,7 +17,7 @@ namespace Oyi::Graphic
         else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) sev = "WARN";
         else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) sev = "VERBOSE";
 
-        std::fprintf(stderr, "[Vulkan][%s] %s\n", sev, callbackData && callbackData->pMessage ? callbackData->pMessage : "(null)");
+        fmt::print(stderr, "[OyiVulkan][{}] {}\n", sev, callbackData && callbackData->pMessage ? callbackData->pMessage : "(null)");
         return VK_FALSE;
     }
 

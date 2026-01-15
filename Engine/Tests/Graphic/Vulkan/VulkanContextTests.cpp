@@ -1,3 +1,4 @@
+#include <fmt/base.h>
 #include <gtest/gtest.h>
 
 #include <SDL3/SDL_vulkan.h>
@@ -5,17 +6,17 @@
 
 #include <vulkan/vulkan.h>
 
-// Vulkan implementation headers are intentionally located under src/Vulkan.
-// The test target must add Engine/Modules/Graphic/src to its include paths.
-#include "Vulkan/VulkanContext.h"
-#include "Vulkan/VulkanQueue.h"
-#include "Vulkan/VulkanCommandPool.h"
-
 // Vulkan Memory Allocator (VMA)
 // IMPORTANT:
 // Do NOT define VMA_IMPLEMENTATION in test translation units.
 // The implementation must be compiled exactly once inside the Graphic module.
 #include <vk_mem_alloc.h>
+
+// Vulkan implementation headers are intentionally located under src/Vulkan.
+// The test target must add Engine/Modules/Graphic/src to its include paths.
+#include "Vulkan/VulkanContext.h"
+#include "Vulkan/VulkanQueue.h"
+#include "Vulkan/VulkanCommandPool.h"
 
 using namespace Oyi::Graphic;
 
@@ -35,7 +36,7 @@ protected:
             // SDL initialization failed.
             // Individual tests will skip accordingly.
             s_sdlInitOk = false;
-            fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+            fmt::print(stderr, "SDL_Init failed: {}\n", SDL_GetError());
             return;
         }
         s_sdlInitOk = true;

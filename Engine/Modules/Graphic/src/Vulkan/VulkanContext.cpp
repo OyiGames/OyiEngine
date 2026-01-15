@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <vector>
+#include <fmt/base.h>
 #include <vulkan/vulkan.h>
 #include "VulkanContext.h"
 #include "VulkanInstance.h"
@@ -12,7 +13,6 @@
 
 namespace Oyi::Graphic
 {
-    // You can move this to a config object later.
     static constexpr bool DefaultEnableValidation = true;
 
     VulkanContext::VulkanContext() = default;
@@ -37,20 +37,9 @@ namespace Oyi::Graphic
         if (instanceObj)
             return;
 
-        // NOTE: In your engine, SDL_Window should come from your platform module.
-        // Here we assume you have a way to pass it in or set it globally.
-        // For now, VulkanSurface is constructed elsewhere or you can add a setter.
-        //
-        // Minimal practical approach:
-        // - Provide a VulkanContext::setWindow(SDL_Window*) API
-        //   then create VulkanSurface here.
-        //
-        // Since your header earlier didn't include that, this cpp assumes:
-        // surface is already set by you before initialize() OR you will add a window setter.
-
         if (!surface)
         {
-            std::fprintf(stderr, "[Vulkan] VulkanContext::initialize requires surface to be created with a valid SDL_Window.\n");
+            fmt::print(stderr, "[OyiVulkan] VulkanContext::initialize requires surface to be created with a valid SDL_Window.\n");
             return;
         }
 
@@ -61,7 +50,7 @@ namespace Oyi::Graphic
         instanceObj->create("OyiEngine", exts, DefaultEnableValidation);
         if (instanceObj->handle() == VK_NULL_HANDLE)
         {
-            std::fprintf(stderr, "[Vulkan] Failed to create VkInstance.\n");
+            fmt::print(stderr, "[OyiVulkan] Failed to create VkInstance.\n");
             instanceObj.reset();
             return;
         }
@@ -75,7 +64,7 @@ namespace Oyi::Graphic
         surface->create(instanceObj->handle());
         if (surface->handle() == VK_NULL_HANDLE)
         {
-            std::fprintf(stderr, "[Vulkan] Failed to create VkSurfaceKHR.\n");
+            fmt::print(stderr, "[OyiVulkan] Failed to create VkSurfaceKHR.\n");
             shutdown();
             return;
         }
@@ -85,7 +74,7 @@ namespace Oyi::Graphic
         deviceObj->create(instanceObj->handle(), *surface);
         if (deviceObj->logical() == VK_NULL_HANDLE)
         {
-            std::fprintf(stderr, "[Vulkan] Failed to create VkDevice.\n");
+            fmt::print(stderr, "[OyiVulkan] Failed to create VkDevice.\n");
             shutdown();
             return;
         }

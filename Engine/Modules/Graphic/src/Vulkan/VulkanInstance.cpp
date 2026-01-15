@@ -1,6 +1,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdio>
+#include <fmt/base.h>
 #include <vulkan/vulkan.h>
 #include "VulkanInstance.h"
 #include "VulkanDebug.h"
@@ -94,7 +95,7 @@ namespace Oyi::Graphic
         VkResult r = vkCreateInstance(&ci, nullptr, &instance);
         if (r != VK_SUCCESS)
         {
-            std::fprintf(stderr, "[Vulkan] vkCreateInstance failed: %d\n", int(r));
+            fmt::print(stderr, "[OyiVulkan] vkCreateInstance failed: {}\n", int(r));
             instance = VK_NULL_HANDLE;
         }
     }
