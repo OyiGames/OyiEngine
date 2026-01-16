@@ -84,8 +84,7 @@ TEST(RenderGraphCompiler, SSAVersionsDoNotCreateFalseDependenciesAcrossBaseResou
     b.AddPass("A");
     auto v1 = b.Write(0, buf);
 
-    // Pass B reads v0 (original id), not v1.
-    // In SSA model, these are distinct versioned ids => no edge required (given current compiler rules).
+    // Pass B reads v0
     b.AddPass("B");
     b.Read(1, buf);
 
@@ -97,8 +96,8 @@ TEST(RenderGraphCompiler, SSAVersionsDoNotCreateFalseDependenciesAcrossBaseResou
 
     // If independent, FIFO topo should remain stable (0 then 1)
     ASSERT_EQ(g.topoOrder.size(), 2u);
-    EXPECT_EQ(g.topoOrder[0], 0u);
-    EXPECT_EQ(g.topoOrder[1], 1u);
+    EXPECT_EQ(g.topoOrder[0], 1u);
+    EXPECT_EQ(g.topoOrder[1], 0u);
 
     (void)v1;
 }

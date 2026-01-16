@@ -21,6 +21,7 @@ endif()
 
 if (MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    add_compile_options(/Zc:preprocessor)
 endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")

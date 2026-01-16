@@ -60,11 +60,12 @@ struct OYI_GRAPHIC_API RGCompiledGraph
 class OYI_GRAPHIC_API RenderGraphCompiler
 {
 public:
-    void Compile(const RenderGraphBuilder& builder);
+    void Compile(const RenderGraphBuilder& b);
 
     const RGCompiledGraph& GetCompiledGraph() const { return compiled; }
 
 private:
+    void Validate() const;
     void BuildDependencies();
     void TopologicalSortFIFO();
     void AnalyzeResourceLifetimes();
@@ -75,6 +76,7 @@ private:
 
 private:
     // Inputs (copied for compilation stability)
+    const RenderGraphBuilder* builder = nullptr; 
     std::vector<RHIResource> resources;
     std::vector<RGPass> passes; // node id == index in this vector
 

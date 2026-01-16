@@ -56,17 +56,6 @@ public:
         return RGResourceHandle{ id, id };
     }
 
-    // Backward compatible API (optional)
-    RHIResourceID CreateBuffer(const std::string& name, uint64_t sizeBytes, uint32_t usageMask = 0)
-    {
-        return CreateBufferH(name, sizeBytes, usageMask).id;
-    }
-    RHIResourceID CreateTexture2D(const std::string& name, uint32_t w, uint32_t h, RHITextureFormat fmt,
-                                 uint16_t mips = 1, uint16_t layers = 1, uint8_t samples = 1, uint32_t usageMask = 0)
-    {
-        return CreateTexture2DH(name, w, h, fmt, mips, layers, samples, usageMask).id;
-    }
-
     // Create pass
     RGPass& AddPass(const std::string& name)
     {
