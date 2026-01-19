@@ -14,4 +14,6 @@ target_link_libraries(TEST_RenderGraph PRIVATE
     gtest_main
 )
 
+target_link_libraries(TEST_RenderGraph PRIVATE fmt::fmt)
+
 add_test(NAME TEST_RenderGraph COMMAND TEST_RenderGraph)
