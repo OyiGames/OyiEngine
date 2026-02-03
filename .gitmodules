@@ -26,3 +26,7 @@
 	path = Engine/Packages/fmt
 	url = https://github.com/fmtlib/fmt.git
 	branch = master
+[submodule "Engine/Packages/NRI"]
+	path = Engine/Packages/NRI
+	url = https://github.com/OyiGames/NRI.git
+	branch = main

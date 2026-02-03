@@ -11,10 +11,11 @@
 #include <string>
 #include <vector>
 
-#include <Graphic/RHI/RHIResource.h>
-
 namespace Oyi::Graphic
 {
+using RHIResourceID = uint32_t;
+static constexpr RHIResourceID InvalidRHIResource = 0;
+
 // Backend-agnostic access intent. Backends map this to API states/barriers.
 enum class RGAccessType : uint8_t
 {

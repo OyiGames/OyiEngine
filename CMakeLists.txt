@@ -29,8 +29,6 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 include(CMake/OutputDirectories.cmake)
 include(cmake/CopySpecifiedFilesToBuild.cmake)
 
-option(OYI_GRAPHIC_VULKAN "Enable Vulkan backend" ON)
-
 include(CMake/Release/fmt_release.cmake)
 setup_output_directories(fmt)
 
@@ -46,27 +44,18 @@ setup_output_directories(gtest_lib)
 include(CMake/Release/sdl_release.cmake)
 setup_output_directories(SDL3-shared)
 
-if (OYI_GRAPHIC_VULKAN)
-find_package(Vulkan REQUIRED)
-message(STATUS "==> FindVulkan.cmake path: ${_FINDVULKAN_CMAKE_FILE}")
-message("find vulkan : ${Vulkan_FOUND}")
-if(${Vulkan_FOUND})
-    message("vulkan libs : ${Vulkan_LIBRARY}")
-    copy_specified_files_to_build(FILES ${Vulkan_LIBRARY})
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+include(CMake/Debug/nri_debug.cmake)
+setup_output_directories(NRI_Shared)
+else()
+include(CMake/Release/nri_release.cmake)
+setup_output_directories(NRI_Shared)
 endif()
-include(CMake/Release/vma_release.cmake)
-setup_output_directories(VMA)
-endif()
-
-# if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-# else()
-# endif()
 
 add_subdirectory(Engine/Benchmarks/Malloc)
 add_subdirectory(Engine/Benchmarks/GTL)
-add_subdirectory(Engine/Modules/Graphic)
-add_subdirectory(Engine/Tests/Graphic/RDG)
-add_subdirectory(Engine/Tests/Graphic/Vulkan)
+# add_subdirectory(Engine/Modules/Graphic)
+# add_subdirectory(Engine/Tests/Graphic/RDG)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -78,7 +67,6 @@ set_property(TARGET
     mimalloc-static
     SDL3-shared
     SDL_uclibc
-    OyiVMA
     PROPERTY FOLDER "Packages"
 )
 
@@ -88,8 +76,7 @@ set_property(TARGET
     PROPERTY FOLDER "Benchmarks"
 )
 
-set_property(TARGET 
-    TEST_RenderGraph
-    TEST_Vulkan
-    PROPERTY FOLDER "Tests"
-)
+# set_property(TARGET 
+#     TEST_RenderGraph
+#     PROPERTY FOLDER "Tests"
+# )
