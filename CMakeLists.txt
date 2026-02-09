@@ -46,10 +46,10 @@ setup_output_directories(SDL3-shared)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 include(CMake/Debug/nri_debug.cmake)
-setup_output_directories(NRI_Shared)
+setup_output_directories(NRI)
 else()
 include(CMake/Release/nri_release.cmake)
-setup_output_directories(NRI_Shared)
+setup_output_directories(NRI)
 endif()
 
 add_subdirectory(Engine/Benchmarks/Malloc)

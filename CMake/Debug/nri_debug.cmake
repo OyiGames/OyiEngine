@@ -1,4 +1,4 @@
-add_subdirectory(${CMAKE_SOURCE_DIR}/Engine/Packages/NRI EXCLUDE_FROM_ALL)
+add_subdirectory(${CMAKE_SOURCE_DIR}/Engine/Packages/NRI)
 
 set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Single-config generator build type: Debug for better symbols and diagnostics.")
 
