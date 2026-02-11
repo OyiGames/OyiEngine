@@ -30,3 +30,7 @@
 	path = Engine/Packages/NRI
 	url = https://github.com/OyiGames/NRI.git
 	branch = main
+[submodule "Engine/Packages/assimp"]
+	path = Engine/Packages/assimp
+	url = https://github.com/assimp/assimp.git
+	branch = master
