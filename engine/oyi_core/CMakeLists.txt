@@ -1,0 +1,9 @@
+oyi_add_module(core
+    PUBLIC_HEADERS
+        include/oyi_core/Assert.h
+        include/oyi_core/Handle.h
+        include/oyi_core/Version.h
+    SOURCES
+        src/oyi_core/Assert.cpp
+        src/oyi_core/Version.cpp
+)

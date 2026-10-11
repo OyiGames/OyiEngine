@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  VCPKG_COMMIT: e456309491fd875487bf02b8a0dca76c1b1b00cc
+
+jobs:
+  lint:
+    name: format & conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install linters
+        run: pip install "clang-format>=19,<20" ruff
+      - name: clang-format --dry-run
+        run: |
+          files=$(git ls-files 'engine/**/*.h' 'engine/**/*.cpp' 'tools/**/*.h' 'tools/**/*.cpp' 'tests/**/*.cpp' 'tests/**/*.h')
+          clang-format --dry-run -Werror $files
+      - name: ruff (python scripts)
+        run: |
+          ruff check scripts
+          ruff format --check scripts
+      - name: Repository conventions
+        run: python scripts/check_sources.py
+
+  build:
+    name: ${{ matrix.preset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, preset: windows-msvc,  cache: nuget }
+          - { os: windows-latest, preset: windows-clang, cache: nuget }
+          - { os: macos-latest,   preset: macos,         cache: files }
+          - { os: macos-latest,   preset: macos-asan,    cache: files }
+    env:
+      VCPKG_NUGET_PAT: ${{ secrets.VCPKG_NUGET_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          doNotCache: true
+
+      # Binary cache (ADR-0020): Windows uses NuGet + GitHub Packages when the secret exists,
+      # otherwise (and on macOS) fall back to the files backend + actions/cache.
+      - name: Binary cache (NuGet / GitHub Packages)
+        if: matrix.cache == 'nuget' && env.VCPKG_NUGET_PAT != ''
+        shell: pwsh
+        run: |
+          $nuget = & "$env:VCPKG_ROOT/vcpkg.exe" fetch nuget | Select-Object -Last 1
+          & $nuget sources add -Name GitHub -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" -UserName "${{ github.repository_owner }}" -Password "$env:VCPKG_NUGET_PAT" -StorePasswordInClearText
+          & $nuget setapikey "$env:VCPKG_NUGET_PAT" -Source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          "VCPKG_BINARY_SOURCES=clear;nuget,GitHub,readwrite" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Binary cache (files + actions/cache)
+        if: matrix.cache == 'files' || env.VCPKG_NUGET_PAT == ''
+        shell: bash
+        run: |
+          echo "VCPKG_BINARY_SOURCES=clear;files,${{ runner.temp }}/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
+      - name: Restore vcpkg cache
+        if: matrix.cache == 'files' || env.VCPKG_NUGET_PAT == ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-${{ matrix.preset }}-${{ hashFiles('vcpkg.json') }}-${{ env.VCPKG_COMMIT }}
+          restore-keys: vcpkg-${{ matrix.preset }}-
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build (Debug)
+        run: cmake --build --preset ${{ matrix.preset }}-debug
+      - name: Verify headers are self-contained
+        if: matrix.preset != 'macos-asan'
+        run: cmake --build --preset ${{ matrix.preset }}-verify-headers
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}-debug
+      - name: Repository conventions (with vcpkg include dir)
+        shell: bash
+        run: python3 scripts/check_sources.py --vcpkg-include "$(ls -d out/build/${{ matrix.preset }}/vcpkg_installed/*/include | head -1)"
+
+  tidy:
+    name: clang-tidy (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install llvm + ninja
+        run: brew install llvm ninja
+      - name: vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          doNotCache: true
+      - name: Binary cache (files)
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${{ runner.temp }}/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-macos-${{ hashFiles('vcpkg.json') }}-${{ env.VCPKG_COMMIT }}
+          restore-keys: vcpkg-macos-
+      - name: Configure + build with clang-tidy
+        env:
+          OYI_CLANG_TIDY: /opt/homebrew/opt/llvm/bin/clang-tidy
+        run: |
+          cmake --preset macos-tidy
+          cmake --build --preset macos-tidy-debug
