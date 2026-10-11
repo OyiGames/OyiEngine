@@ -1,0 +1,3 @@
+# Modules in dependency order. Dependencies only point downwards (ADR-0003):
+#   platform <- core <- job <- ecs <- transform <- script / physics / net
+add_subdirectory(oyi_core)

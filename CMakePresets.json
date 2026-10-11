@@ -1,0 +1,136 @@
+{
+  "version": 10,
+  "cmakeMinimumRequired": { "major": 3, "minor": 31, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc",
+      "inherits": "base",
+      "displayName": "Windows x64 (MSVC)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": {
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/windows-msvc.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      }
+    },
+    {
+      "name": "windows-clang",
+      "inherits": "base",
+      "displayName": "Windows x64 (clang-cl)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": {
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/windows-clang.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      }
+    },
+    {
+      "name": "macos",
+      "inherits": "base",
+      "displayName": "macOS arm64 (Apple Clang)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "cacheVariables": {
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/macos.cmake",
+        "VCPKG_TARGET_TRIPLET": "arm64-osx"
+      }
+    },
+    {
+      "name": "macos-asan",
+      "inherits": "macos",
+      "displayName": "macOS arm64 + ASan/UBSan",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "macos-tidy",
+      "inherits": "macos",
+      "displayName": "macOS + clang-tidy (CI)",
+      "cacheVariables": {
+        "CMAKE_CXX_CLANG_TIDY": "$env{OYI_CLANG_TIDY};--warnings-as-errors=*"
+      }
+    },
+    {
+      "name": "ios",
+      "inherits": "base",
+      "displayName": "iOS arm64 (device)",
+      "generator": "Xcode",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "cacheVariables": {
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/ios.cmake",
+        "VCPKG_TARGET_TRIPLET": "arm64-ios",
+        "BUILD_TESTING": "OFF",
+        "OYI_BUILD_TOOLS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-msvc-debug",   "configurePreset": "windows-msvc",  "configuration": "Debug" },
+    { "name": "windows-msvc-release", "configurePreset": "windows-msvc",  "configuration": "Release" },
+    { "name": "windows-clang-debug",  "configurePreset": "windows-clang", "configuration": "Debug" },
+    { "name": "windows-clang-release","configurePreset": "windows-clang", "configuration": "Release" },
+    { "name": "macos-debug",          "configurePreset": "macos",         "configuration": "Debug" },
+    { "name": "macos-release",        "configurePreset": "macos",         "configuration": "Release" },
+    { "name": "macos-asan-debug",     "configurePreset": "macos-asan",    "configuration": "Debug" },
+    { "name": "macos-tidy-debug",     "configurePreset": "macos-tidy",    "configuration": "Debug" },
+    { "name": "ios-release",          "configurePreset": "ios",           "configuration": "Release" },
+
+    { "name": "windows-msvc-verify-headers", "configurePreset": "windows-msvc", "configuration": "Debug", "targets": ["all_verify_interface_header_sets"] },
+    { "name": "windows-clang-verify-headers","configurePreset": "windows-clang","configuration": "Debug", "targets": ["all_verify_interface_header_sets"] },
+    { "name": "macos-verify-headers",        "configurePreset": "macos",        "configuration": "Debug", "targets": ["all_verify_interface_header_sets"] }
+  ],
+  "testPresets": [
+    { "name": "windows-msvc-debug",  "configurePreset": "windows-msvc",  "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "windows-clang-debug", "configurePreset": "windows-clang", "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "macos-debug",         "configurePreset": "macos",         "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "macos-asan-debug",    "configurePreset": "macos-asan",    "configuration": "Debug", "output": { "outputOnFailure": true } }
+  ],
+  "workflowPresets": [
+    {
+      "name": "windows-msvc",
+      "steps": [
+        { "type": "configure", "name": "windows-msvc" },
+        { "type": "build",     "name": "windows-msvc-debug" },
+        { "type": "build",     "name": "windows-msvc-verify-headers" },
+        { "type": "test",      "name": "windows-msvc-debug" }
+      ]
+    },
+    {
+      "name": "windows-clang",
+      "steps": [
+        { "type": "configure", "name": "windows-clang" },
+        { "type": "build",     "name": "windows-clang-debug" },
+        { "type": "build",     "name": "windows-clang-verify-headers" },
+        { "type": "test",      "name": "windows-clang-debug" }
+      ]
+    },
+    {
+      "name": "macos",
+      "steps": [
+        { "type": "configure", "name": "macos" },
+        { "type": "build",     "name": "macos-debug" },
+        { "type": "build",     "name": "macos-verify-headers" },
+        { "type": "test",      "name": "macos-debug" }
+      ]
+    },
+    {
+      "name": "macos-asan",
+      "steps": [
+        { "type": "configure", "name": "macos-asan" },
+        { "type": "build",     "name": "macos-asan-debug" },
+        { "type": "test",      "name": "macos-asan-debug" }
+      ]
+    }
+  ]
+}

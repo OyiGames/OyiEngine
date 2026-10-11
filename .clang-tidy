@@ -1,0 +1,69 @@
+# OyiEngine clang-tidy configuration (ADR-0003). Warnings are errors; naming rules are in CheckOptions.
+---
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-braces-around-statements,
+  -readability-function-cognitive-complexity,
+  -readability-named-parameter,
+  -readability-uppercase-literal-suffix,
+  -readability-trailing-comma,
+  cppcoreguidelines-pro-type-cstyle-cast,
+  cppcoreguidelines-pro-type-static-cast-downcast,
+  cppcoreguidelines-no-malloc,
+  cppcoreguidelines-owning-memory,
+  cppcoreguidelines-macro-usage,
+  cppcoreguidelines-special-member-functions,
+  cppcoreguidelines-virtual-class-destructor,
+  misc-include-cleaner,
+  misc-unused-parameters,
+  misc-const-correctness,
+  misc-non-private-member-variables-in-classes
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(engine|tools|tests)[/\\].*'
+FormatStyle: file
+
+CheckOptions:
+  readability-identifier-naming.NamespaceCase:            lower_case
+  readability-identifier-naming.ClassCase:                CamelCase
+  readability-identifier-naming.StructCase:               CamelCase
+  readability-identifier-naming.UnionCase:                CamelCase
+  readability-identifier-naming.EnumCase:                 CamelCase
+  readability-identifier-naming.EnumConstantCase:         CamelCase
+  readability-identifier-naming.TypeAliasCase:            CamelCase
+  readability-identifier-naming.TypedefCase:              CamelCase
+  readability-identifier-naming.ConceptCase:              CamelCase
+  readability-identifier-naming.TemplateParameterCase:    CamelCase
+  readability-identifier-naming.FunctionCase:             CamelCase
+  readability-identifier-naming.MethodCase:               CamelCase
+  readability-identifier-naming.ParameterCase:            camelBack
+  readability-identifier-naming.LocalVariableCase:        camelBack
+  readability-identifier-naming.LocalConstantCase:        camelBack
+  readability-identifier-naming.VariableCase:             camelBack
+  readability-identifier-naming.MemberCase:               CamelCase
+  readability-identifier-naming.MemberPrefix:             m
+  readability-identifier-naming.ClassMemberCase:          CamelCase
+  readability-identifier-naming.ClassMemberPrefix:        s
+  readability-identifier-naming.GlobalVariableCase:       CamelCase
+  readability-identifier-naming.GlobalVariablePrefix:     g
+  readability-identifier-naming.ConstexprVariableCase:    CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix:  k
+  readability-identifier-naming.GlobalConstantCase:       CamelCase
+  readability-identifier-naming.GlobalConstantPrefix:     k
+  readability-identifier-naming.ClassConstantCase:        CamelCase
+  readability-identifier-naming.ClassConstantPrefix:      k
+  readability-identifier-naming.StaticConstantCase:       CamelCase
+  readability-identifier-naming.StaticConstantPrefix:     k
+  readability-identifier-naming.MacroDefinitionCase:      UPPER_CASE
+  readability-identifier-naming.MacroDefinitionPrefix:    OYI_
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
+  cppcoreguidelines-macro-usage.AllowedRegexp: '^OYI_'

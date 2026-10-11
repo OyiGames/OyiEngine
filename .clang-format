@@ -1,0 +1,67 @@
+# OyiEngine code style (ADR-0003). CI runs clang-format 19 with --dry-run -Werror.
+---
+Language: Cpp
+Standard: Latest
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+AccessModifierOffset: -4
+NamespaceIndentation: None
+
+BreakBeforeBraces: Attach
+BreakTemplateDeclarations: Yes
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+QualifierAlignment: Left
+DerivePointerAlignment: false
+
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignEscapedNewlines: Right
+
+BinPackArguments: true
+BinPackParameters: true
+Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeParens: ControlStatements
+SpacesInParens: Never
+
+FixNamespaceComments: true
+IndentPPDirectives: None
+IndentCaseLabels: false
+KeepEmptyLines:
+  AtStartOfBlock: false
+MaxEmptyLinesToKeep: 1
+InsertNewlineAtEOF: true
+RequiresClausePosition: OwnLine
+PackConstructorInitializers: NextLine
+BreakConstructorInitializers: BeforeComma
+
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<oyi_[a-z0-9_]+/'   # engine modules
+    Priority: 1
+  - Regex: '^<[a-zA-Z0-9_]+/'    # third party (with a directory)
+    Priority: 2
+  - Regex: '^<[a-zA-Z0-9_]+\.h>' # third party (C headers)
+    Priority: 2
+  - Regex: '^<[a-z_]+>'          # standard library
+    Priority: 3
+IncludeIsMainRegex: '$'
