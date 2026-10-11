@@ -32,16 +32,16 @@ enum class FieldKind : uint8_t {
 // Flag sets are one byte; widening them is a schema change that bumps the protocol version.
 enum class FieldFlags : uint8_t {
     None       = 0,
-    Replicated = 1u << 0,
-    Hidden     = 1u << 1,
+    Replicated = 1u << 0u,
+    Hidden     = 1u << 1u,
 };
 OYI_ENUM_FLAGS(FieldFlags);
 
 enum class ComponentFlags : uint8_t {
     None       = 0,
-    Tag        = 1u << 0, ///< no data; presence is the information
-    Replicated = 1u << 1, ///< at least one field is replicated
-    Chunk      = 1u << 2, ///< one value per chunk instead of per entity
+    Tag        = 1u << 0u, ///< no data; presence is the information
+    Replicated = 1u << 1u, ///< at least one field is replicated
+    Chunk      = 1u << 2u, ///< one value per chunk instead of per entity
 };
 OYI_ENUM_FLAGS(ComponentFlags);
 
