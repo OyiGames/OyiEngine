@@ -1,6 +1,8 @@
 #pragma once
 
 // Golden case: one of everything the generator accepts.
+// Hand-aligned for readability; this is test input, not engine code.
+// clang-format off
 
 #include <oyi_core/Annotations.h>
 #include <oyi_core/Handle.h>
@@ -40,3 +42,5 @@ struct OYI_COMPONENT() Everything {
 struct OYI_COMPONENT(Tag, Replicated) Marker {};
 
 } // namespace oyi::golden
+
+// clang-format on

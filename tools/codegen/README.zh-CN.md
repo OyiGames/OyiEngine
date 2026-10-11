@@ -58,7 +58,7 @@ struct OYI_COMPONENT(Tag) Dead {};
 | OYI-C013 | `Quantize` 只能用于 `float` / `double` |
 | OYI-C016 | 不允许多维数组 |
 | OYI-C017 | 枚举必须是带定宽底层类型的 `enum class` |
-| OYI-P001 | clang 解析头文件失败 |
+| OYI-P001 | clang 解析头文件失败；此时单独报告，不再运行其它规则 |
 
 ## 命令行
 

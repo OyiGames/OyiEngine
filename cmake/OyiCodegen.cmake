@@ -93,8 +93,35 @@ if(MSVC)
         list(APPEND OYI_CODEGEN_CLANG_ARGS "-isystem" "${_dir}")
     endforeach()
 endif()
-if(APPLE AND CMAKE_OSX_SYSROOT)
-    list(APPEND OYI_CODEGEN_CLANG_ARGS "-isysroot" "${CMAKE_OSX_SYSROOT}")
+if(APPLE)
+    # libclang runs in-process and does not ask xcrun for the default SDK the way Apple's clang driver
+    # does, so the sysroot must be passed explicitly. CMake 4 leaves CMAKE_OSX_SYSROOT empty when the
+    # compiler's own SDK is fine, and the Xcode generator may hold an SDK name ("iphoneos") rather
+    # than a path; resolve both through xcrun.
+    set(_oyi_sysroot "${CMAKE_OSX_SYSROOT}")
+    if(NOT IS_DIRECTORY "${_oyi_sysroot}")
+        if(_oyi_sysroot)
+            set(_oyi_sdk_name "${_oyi_sysroot}")
+        elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+            set(_oyi_sdk_name iphoneos)
+        else()
+            set(_oyi_sdk_name macosx)
+        endif()
+        execute_process(
+            COMMAND xcrun --sdk "${_oyi_sdk_name}" --show-sdk-path
+            OUTPUT_VARIABLE _oyi_sysroot
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _oyi_sysroot_rc
+            ERROR_QUIET
+        )
+        if(NOT _oyi_sysroot_rc EQUAL 0 OR NOT IS_DIRECTORY "${_oyi_sysroot}")
+            message(FATAL_ERROR
+                "oyi_codegen: cannot locate the ${_oyi_sdk_name} SDK (xcrun --sdk ${_oyi_sdk_name} "
+                "--show-sdk-path failed); pass -DCMAKE_OSX_SYSROOT=<path to the SDK>.")
+        endif()
+    endif()
+    message(STATUS "oyi_codegen: sysroot = ${_oyi_sysroot}")
+    list(APPEND OYI_CODEGEN_CLANG_ARGS "-isysroot" "${_oyi_sysroot}")
 endif()
 
 # oyi_target_codegen(<target> INCLUDE_ROOT <dir> HEADERS <include-relative header>...)

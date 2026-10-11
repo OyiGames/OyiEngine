@@ -28,7 +28,9 @@ def _split_clang_args(argv: list[str]) -> tuple[list[str], list[str]]:
 def _run(path: str, header_name: str, libclang: str | None, clang_args: list[str]):
     frontend.load_libclang(libclang)
     tu, diagnostics = frontend.parse(path, clang_args)
-    if tu is None:
+    if tu is None or diagnostics:
+        # clang errors (OYI-P001) leave recovered, half-valid types in the AST; running the rules on
+        # it would only add misleading follow-on diagnostics, so stop at the parse errors.
         return None, diagnostics
     schema = analyze.analyze(tu, path, header_name, diagnostics)
     return schema, diagnostics

@@ -59,7 +59,7 @@ struct OYI_COMPONENT(Tag) Dead {};
 | OYI-C013 | `Quantize` only on `float` / `double` |
 | OYI-C016 | no multi-dimensional arrays |
 | OYI-C017 | enums must be `enum class` with a fixed-width underlying type |
-| OYI-P001 | clang could not parse the header |
+| OYI-P001 | clang could not parse the header; reported on its own, no other rule runs |
 
 ## Command line
 

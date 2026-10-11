@@ -1,6 +1,8 @@
 #pragma once
 
 // Golden case: every rule the validator enforces, one violation each (see expected/Invalid.errors.txt).
+// Hand-aligned; the expected diagnostics carry line and column numbers, so keep clang-format away.
+// clang-format off
 
 #include <oyi_core/Annotations.h>
 
@@ -58,3 +60,5 @@ struct OYI_COMPONENT() Nested {
 };
 
 } // namespace oyi::golden
+
+// clang-format on
