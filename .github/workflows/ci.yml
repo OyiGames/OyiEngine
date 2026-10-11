@@ -23,10 +23,10 @@ jobs:
         run: |
           files=$(git ls-files 'engine/**/*.h' 'engine/**/*.cpp' 'tools/**/*.h' 'tools/**/*.cpp' 'tests/**/*.cpp' 'tests/**/*.h')
           clang-format --dry-run -Werror $files
-      - name: ruff (python scripts)
+      - name: ruff (python scripts and tools)
         run: |
-          ruff check scripts
-          ruff format --check scripts
+          ruff check scripts tools/codegen tests
+          ruff format --check scripts tools/codegen tests
       - name: Repository conventions
         run: python scripts/check_sources.py
 
@@ -53,6 +53,13 @@ jobs:
       - name: Install ninja (macOS)
         if: runner.os == 'macOS'
         run: brew install ninja
+
+      # tools/codegen needs the libclang python bindings; libclang itself comes from the
+      # Visual Studio LLVM component or Xcode (cmake/OyiCodegen.cmake finds it).
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install codegen dependencies
+        run: python -m pip install -r tools/codegen/requirements.txt
 
       - name: vcpkg
         uses: lukka/run-vcpkg@v11
@@ -104,6 +111,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install llvm + ninja
         run: brew install llvm ninja
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install codegen dependencies
+        run: python -m pip install -r tools/codegen/requirements.txt
       - name: vcpkg
         uses: lukka/run-vcpkg@v11
         with:

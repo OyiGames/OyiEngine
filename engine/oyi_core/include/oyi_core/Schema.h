@@ -1,0 +1,72 @@
+#pragma once
+
+#include <oyi_core/EnumFlags.h>
+#include <oyi_core/TypeId.h>
+
+#include <cstdint>
+#include <span>
+#include <string_view>
+
+namespace oyi::core {
+
+/// Runtime description of reflected components (ADR-0011). Instances are emitted by
+/// tools/codegen into `<oyi_mod/X.gen.h>`; nothing here is filled in by hand.
+
+enum class FieldKind : uint8_t {
+    Bool,
+    Int8,
+    UInt8,
+    Int16,
+    UInt16,
+    Int32,
+    UInt32,
+    Int64,
+    UInt64,
+    Float32,
+    Float64,
+    Enum,    ///< enum class with a fixed-width underlying type; mTypeId names the enum
+    Struct,  ///< OYI_STRUCT / OYI_COMPONENT value or a known handle type; mTypeId names it
+    Padding, ///< explicit padding bytes (mPad*); never serialized or shown
+};
+
+// Flag sets are one byte; widening them is a schema change that bumps the protocol version.
+enum class FieldFlags : uint8_t {
+    None       = 0,
+    Replicated = 1u << 0,
+    Hidden     = 1u << 1,
+};
+OYI_ENUM_FLAGS(FieldFlags);
+
+enum class ComponentFlags : uint8_t {
+    None       = 0,
+    Tag        = 1u << 0, ///< no data; presence is the information
+    Replicated = 1u << 1, ///< at least one field is replicated
+    Chunk      = 1u << 2, ///< one value per chunk instead of per entity
+};
+OYI_ENUM_FLAGS(ComponentFlags);
+
+struct FieldInfo {
+    std::string_view mName;
+    std::string_view mTypeName; ///< element type as written in the source, e.g. "std::uint32_t"
+    uint32_t mOffset  = 0;
+    uint32_t mSize    = 0; ///< bytes of the whole field, arrays included
+    uint32_t mCount   = 1; ///< array element count, 1 for scalars
+    FieldKind mKind   = FieldKind::Padding;
+    FieldFlags mFlags = FieldFlags::None;
+    TypeId mTypeId    = {};   ///< valid for Enum and Struct kinds
+    float mQuantize   = 0.0f; ///< replication step; 0 means exact
+};
+
+struct ComponentInfo {
+    std::string_view mName; ///< fully qualified, e.g. "oyi::transform::LocalToWorld"
+    TypeId mTypeId        = {};
+    uint32_t mSize        = 0;
+    uint32_t mAlign       = 0;
+    ComponentFlags mFlags = ComponentFlags::None;
+    std::span<const FieldInfo> mFields;
+    /// FNV-1a over name, type, offset and size of every field plus size and alignment.
+    /// Changes exactly when the memcpy layout changes; snapshots and replication key on it.
+    uint64_t mLayoutHash = 0;
+};
+
+} // namespace oyi::core

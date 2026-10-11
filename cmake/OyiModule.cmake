@@ -5,9 +5,13 @@
 #   engine/oyi_<name>/src/oyi_<name>/*.cpp     implementation; private headers next to it,
 #                                              #include <oyi_<name>/detail/X.h>
 #   target oyi_<name>, alias oyi::<name>, namespace oyi::<name>
+#
+# COMPONENT_HEADERS lists public headers (same paths as in PUBLIC_HEADERS) that declare
+# OYI_COMPONENT / OYI_STRUCT types; tools/codegen turns each into <oyi_<name>/X.gen.h> (ADR-0011).
+# NO_INSTALL keeps a module out of the SDK export (test fixtures).
 
 function(oyi_add_module name)
-    cmake_parse_arguments(ARG "" "" "SOURCES;PUBLIC_HEADERS;PRIVATE_HEADERS;DEPS;PRIVATE_DEPS" ${ARGN})
+    cmake_parse_arguments(ARG "NO_INSTALL" "" "SOURCES;PUBLIC_HEADERS;PRIVATE_HEADERS;COMPONENT_HEADERS;DEPS;PRIVATE_DEPS" ${ARGN})
     set(target "oyi_${name}")
 
     add_library(${target})
@@ -37,10 +41,23 @@ function(oyi_add_module name)
         EXPORT_NAME "${name}"
     )
 
-    install(TARGETS ${target} oyi_build_settings
-        EXPORT oyi-targets
-        FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    )
+    if(ARG_COMPONENT_HEADERS)
+        set(include_root "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        set(relative_headers)
+        foreach(header IN LISTS ARG_COMPONENT_HEADERS)
+            cmake_path(ABSOLUTE_PATH header BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE absolute)
+            cmake_path(RELATIVE_PATH absolute BASE_DIRECTORY "${include_root}" OUTPUT_VARIABLE relative)
+            list(APPEND relative_headers "${relative}")
+        endforeach()
+        oyi_target_codegen(${target} INCLUDE_ROOT "${include_root}" HEADERS ${relative_headers})
+    endif()
+
+    if(NOT ARG_NO_INSTALL)
+        install(TARGETS ${target} oyi_build_settings
+            EXPORT oyi-targets
+            FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+        )
+    endif()
 endfunction()
 
 function(oyi_add_executable name)

@@ -10,9 +10,11 @@ CLI-first, targeting Windows / macOS / iOS first (Android and Linux later).
 
 ## Build
 
-Prerequisites: CMake 3.31+, Ninja, a vcpkg checkout with `VCPKG_ROOT` set, and on Windows a
-Visual Studio developer environment (`vcvars64.bat`). All commands are stateless; never `cd` into the
-build directory.
+Prerequisites: CMake 3.31+, Ninja, a vcpkg checkout with `VCPKG_ROOT` set, Python 3.11+ with
+`python -m pip install -r tools/codegen/requirements.txt`, and a libclang from the host toolchain
+(the Visual Studio "C++ Clang tools" component, Xcode, or Homebrew LLVM; see
+[tools/codegen/README.md](tools/codegen/README.md)). On Windows run inside a Visual Studio developer
+environment (`vcvars64.bat`). All commands are stateless; never `cd` into the build directory.
 
 ```bash
 cmake --workflow --preset windows-msvc   # configure + Debug build + header self-containment check + tests
@@ -29,6 +31,7 @@ different `VCPKG_ROOT`) belong in `CMakeUserPresets.json`, which is git-ignored.
 engine/oyi_<mod>/include/oyi_<mod>/*.h   public headers   #include <oyi_mod/X.h>
 engine/oyi_<mod>/src/oyi_<mod>/*.cpp     implementation and private headers
 tools/oyi/                               the single command-line entry point
+tools/codegen/                           component reflection generator (Python + libclang)
 tests/oyi_<mod>_tests/                   Catch2 tests
 cmake/                                   OyiModule.cmake, OyiBuildSettings.cmake, toolchains/
 scripts/                                 convention checks run by CI

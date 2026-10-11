@@ -1,0 +1,178 @@
+{
+  "generator": "oyi_codegen 0.1.0",
+  "header": "Basic.h",
+  "records": [
+    {
+      "name": "oyi::golden::Extent",
+      "kind": "struct",
+      "typeId": "0x19473e4e7a2f33c9",
+      "size": 8,
+      "align": 4,
+      "flags": [],
+      "layoutHash": "0x3062be7fbc8adf58",
+      "fields": [
+        {
+          "name": "mWidth",
+          "type": "std::int32_t",
+          "kind": "Int32",
+          "offset": 0,
+          "size": 4,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mHeight",
+          "type": "std::int32_t",
+          "kind": "Int32",
+          "offset": 4,
+          "size": 4,
+          "count": 1,
+          "flags": []
+        }
+      ]
+    },
+    {
+      "name": "oyi::golden::Everything",
+      "kind": "component",
+      "typeId": "0xa82cbc2f5bc1dfd0",
+      "size": 64,
+      "align": 8,
+      "flags": [
+        "Replicated"
+      ],
+      "layoutHash": "0x1da59e47f646a0f2",
+      "fields": [
+        {
+          "name": "mFlag",
+          "type": "bool",
+          "kind": "Bool",
+          "offset": 0,
+          "size": 1,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mTiny",
+          "type": "std::int8_t",
+          "kind": "Int8",
+          "offset": 1,
+          "size": 1,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mPad0",
+          "type": "std::uint8_t",
+          "kind": "Padding",
+          "offset": 2,
+          "size": 4,
+          "count": 4,
+          "flags": []
+        },
+        {
+          "name": "mMode",
+          "type": "Mode",
+          "kind": "Enum",
+          "offset": 6,
+          "size": 2,
+          "count": 1,
+          "flags": [],
+          "typeName": "oyi::golden::Mode",
+          "typeId": "0x4d755dc13decb902"
+        },
+        {
+          "name": "mCount",
+          "type": "std::uint32_t",
+          "kind": "UInt32",
+          "offset": 8,
+          "size": 4,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mRatio",
+          "type": "float",
+          "kind": "Float32",
+          "offset": 12,
+          "size": 4,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mBig",
+          "type": "std::int64_t",
+          "kind": "Int64",
+          "offset": 16,
+          "size": 8,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mPrecise",
+          "type": "double",
+          "kind": "Float64",
+          "offset": 24,
+          "size": 8,
+          "count": 1,
+          "flags": []
+        },
+        {
+          "name": "mSpeed",
+          "type": "float",
+          "kind": "Float32",
+          "offset": 32,
+          "size": 4,
+          "count": 1,
+          "flags": [
+            "Replicated"
+          ],
+          "quantize": 0.5
+        },
+        {
+          "name": "mExtent",
+          "type": "Extent",
+          "kind": "Struct",
+          "offset": 36,
+          "size": 8,
+          "count": 1,
+          "flags": [],
+          "typeName": "oyi::golden::Extent",
+          "typeId": "0x19473e4e7a2f33c9"
+        },
+        {
+          "name": "mOther",
+          "type": "ThingId",
+          "kind": "Struct",
+          "offset": 44,
+          "size": 8,
+          "count": 1,
+          "flags": [],
+          "typeName": "oyi::core::Handle<oyi::golden::ThingTag>",
+          "typeId": "0xc42b824d6f67c5ab"
+        },
+        {
+          "name": "mSamples",
+          "type": "std::uint16_t",
+          "kind": "UInt16",
+          "offset": 52,
+          "size": 12,
+          "count": 6,
+          "flags": []
+        }
+      ]
+    },
+    {
+      "name": "oyi::golden::Marker",
+      "kind": "component",
+      "typeId": "0x64fdf8b45d199907",
+      "size": 1,
+      "align": 1,
+      "flags": [
+        "Replicated",
+        "Tag"
+      ],
+      "layoutHash": "0x96c006bce26d3c77",
+      "fields": []
+    }
+  ]
+}

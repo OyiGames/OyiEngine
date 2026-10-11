@@ -23,7 +23,7 @@ English: [CONTRIBUTING.md](CONTRIBUTING.md)
 - 命名：类型与函数 `PascalCase`；参数与局部变量 `camelCase`；数据成员 `mName`；静态 `sName`；常量 `kName`；宏 `OYI_UPPER_SNAKE`；命名空间 `oyi::module`。
 - 文件：一文件一主类型，`PascalCase.h` / `PascalCase.cpp`；目录小写。
 - include：一律尖括号 `#include <oyi_mod/File.h>`；`.cpp` 第一行 include 自己的头；顶层 include 目录带 `oyi_` 前缀。
-- 组件（POD）：无虚函数、无指针、显式 padding、字段全部值初始化。
+- 组件（POD）用 `<oyi_core/Annotations.h>` 的 `OYI_COMPONENT` / `OYI_STRUCT` 声明，并在 CMake 的 `COMPONENT_HEADERS` 里列出：无虚函数、无指针、定宽整数、显式 padding、字段全部值初始化。`tools/codegen` 在构建期强制这些规则并生成反射表。
 - job 内：禁 `std::function`、直接 TLS、阻塞 I/O、全局 RNG、真实时间。
 - 文档注释用 `///`，一句话说清做什么、何时失败。
 - `TODO` 必须带 issue 号：`// TODO(#123): ...`。
@@ -50,5 +50,6 @@ English: [CONTRIBUTING.md](CONTRIBUTING.md)
 | 静态分析 | `clang-tidy`（命名、bugprone、performance、modernize、readability） |
 | Python 脚本 | `ruff check` 与 `ruff format --check` |
 | 规范 | `python scripts/check_sources.py` |
+| 组件规则 | 构建期由 `tools/codegen` 检查；golden 测试在 `tests/oyi_codegen_tests` |
 | 头文件自包含 | `cmake --build --preset <preset>-verify-headers` |
 | 内存与 UB | 每次 PR 跑 ASan + UBSan 预设 |
