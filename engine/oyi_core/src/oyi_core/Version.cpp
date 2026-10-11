@@ -1,6 +1,7 @@
 #include <oyi_core/Version.h>
 
 #include <format>
+#include <string>
 
 namespace oyi::core {
 

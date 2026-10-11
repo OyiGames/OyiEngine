@@ -5,5 +5,6 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# See windows-msvc.cmake for why these are toolchain-level flags.
-set(CMAKE_CXX_FLAGS_INIT "/utf-8 /permissive- /Zc:__cplusplus /Zc:preprocessor")
+# See windows-msvc.cmake for why these are toolchain-level flags. clang-cl always uses a conforming
+# preprocessor and rejects /Zc:preprocessor as an unused argument under /WX, so it is not listed.
+set(CMAKE_CXX_FLAGS_INIT "/utf-8 /permissive- /Zc:__cplusplus")

@@ -35,7 +35,9 @@ struct Handle {
 
 } // namespace oyi::core
 
+// Specializing std::hash for a program-defined type is explicitly permitted by the standard.
 template <typename Tag>
+// NOLINTNEXTLINE(bugprone-std-namespace-modification)
 struct std::hash<oyi::core::Handle<Tag>> {
     [[nodiscard]] size_t operator()(const oyi::core::Handle<Tag>& handle) const noexcept {
         return std::hash<uint64_t>{}(handle.ToU64());

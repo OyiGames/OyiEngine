@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <format>
+#include <source_location>
+#include <string>
+#include <string_view>
 
 namespace oyi::core {
 

@@ -21,7 +21,7 @@ namespace oyi::core {
     } while (false)
 
 /// OYI_ASSERT: Debug builds only; the expression is not evaluated in Release builds.
-#if defined(NDEBUG)
+#ifdef NDEBUG
 #define OYI_ASSERT(expr, msg)                                                                                          \
     do {                                                                                                               \
     } while (false)
