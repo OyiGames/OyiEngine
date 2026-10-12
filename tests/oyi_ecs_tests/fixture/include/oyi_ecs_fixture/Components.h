@@ -40,4 +40,14 @@ struct OYI_COMPONENT(Chunk) ChunkBounds {
     float mMax[3] = {0.0f, 0.0f, 0.0f};
 };
 
+/// Messages are plain OYI_STRUCT records.
+struct OYI_STRUCT() Damage {
+    oyi::ecs::EntityId mSource{};
+    float mAmount = 0.0f;
+};
+
+struct OYI_STRUCT() Ping {
+    uint32_t mSerial = 0;
+};
+
 } // namespace oyi::ecs_fixture

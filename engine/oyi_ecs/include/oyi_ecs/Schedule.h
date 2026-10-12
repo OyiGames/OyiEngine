@@ -76,6 +76,7 @@ private:
     static void RunSystemJob(job::JobContext& context, void* data);
     void RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept;
     [[nodiscard]] core::Result EndPhase(Phase phase, uint32_t versionsUsed) noexcept;
+    void RouteMessages(Phase phase) noexcept;
     void RefreshQueries(Phase phase) noexcept;
 
     core::Allocator& mAllocator;

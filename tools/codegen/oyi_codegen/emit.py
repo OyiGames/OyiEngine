@@ -92,7 +92,7 @@ def render_header(schema: HeaderSchema) -> str:
         if ns_text:
             out.append(f"}} // namespace {ns_text}")
             out.append("")
-    components = [r for r in schema.records if r.kind == "component"]
+    components = list(schema.records)
     if components:
         out.append("namespace oyi::core {")
         out.append("")
