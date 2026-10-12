@@ -5,6 +5,7 @@
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
 #include <oyi_ecs/World.h>
+#include <oyi_ecs/WorldFile.h>
 #include <oyi_ecs_fixture/Components.gen.h> // IWYU pragma: keep
 #include <oyi_ecs_fixture/Components.h>
 
@@ -12,7 +13,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <initializer_list>
+#include <ios>
 #include <span>
 #include <vector>
 
@@ -134,6 +137,40 @@ TEST_CASE("a saved world loads back byte for byte with its entity handles", "[ec
     const EntityId reborn = *loaded.CreateEntity(MaskOf({types.mPosition}));
     CHECK(reborn.mIndex == 0);
     CHECK(reborn.mGeneration == 2);
+}
+
+TEST_CASE("a saved world describes itself without a registry", "[ecs][serialization]") {
+    Populated original;
+    const std::pmr::vector<std::byte> bytes = SaveOf(original.mWorld);
+    oyi::ecs::WorldFileSummary summary(original.mAllocator);
+    REQUIRE(oyi::ecs::DescribeSavedWorld(bytes, summary).has_value());
+    CHECK(summary.mFormatVersion == 1);
+    CHECK(summary.mSchemaHash == original.mWorld.ComputeSchemaHash());
+    CHECK(summary.mChunkSize == 16 * 1024);
+    CHECK(summary.mWorldVersion == original.mWorld.GetVersion());
+    CHECK(summary.mEntityCount == original.mWorld.GetEntityCount());
+    CHECK(summary.mEntityCapacity == 1500);
+    REQUIRE(summary.mComponents.size() == 5);
+    CHECK(summary.mComponents[0].mName == "oyi::ecs_fixture::Position");
+    CHECK(summary.mComponents[0].mSize == sizeof(Position));
+    REQUIRE(summary.mArchetypes.size() == 3);
+    uint32_t counted = 0;
+    for (const auto& archetype : summary.mArchetypes) {
+        CHECK(archetype.mChunkCount >= 1);
+        CHECK(archetype.mTypes[0] == 0);
+        counted += archetype.mEntityCount;
+    }
+    CHECK(counted == summary.mEntityCount);
+    // Damage is reported, not crashed on.
+    for (const size_t cut : {size_t{2}, size_t{30}, bytes.size() / 3, bytes.size() - 1}) {
+        CHECK(oyi::ecs::DescribeSavedWorld(std::span<const std::byte>(bytes.data(), cut), summary).error().mCode ==
+              ErrorCode::CorruptData);
+    }
+    // Left behind for the command-line test (oyi world inspect).
+    std::ofstream file(OYI_TEST_OUTPUT_DIR "/oyi_cli_world.oyiw", std::ios::binary);
+    file.write(reinterpret_cast<const char*>(bytes.data()),
+               static_cast<std::streamsize>(bytes.size())); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    CHECK(file.good());
 }
 
 TEST_CASE("an empty world round-trips and a loaded world can be cleared and loaded again", "[ecs][serialization]") {

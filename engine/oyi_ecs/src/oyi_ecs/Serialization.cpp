@@ -11,6 +11,7 @@
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
 #include <oyi_ecs/World.h>
+#include <oyi_ecs/WorldFile.h>
 
 #include <array>
 #include <cstddef>
@@ -18,7 +19,9 @@
 #include <cstring>
 #include <expected>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace oyi::ecs {
@@ -303,6 +306,91 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
         return Corrupt("World::Load: entity table and chunks disagree");
     }
     mVersion = worldVersion;
+    return {};
+}
+
+WorldFileSummary::WorldFileSummary(core::Allocator& allocator) noexcept
+    : mResource(allocator), mComponents(&mResource), mArchetypes(&mResource) {}
+
+// NOLINTNEXTLINE(bugprone-exception-escape,readability-function-cognitive-complexity)
+core::Result DescribeSavedWorld(std::span<const std::byte> data, WorldFileSummary& out) noexcept {
+    Reader reader(data);
+    std::array<char, 4> magic{};
+    if (!reader.Get(magic) || magic != kMagic) {
+        return Corrupt("world file: not a world file");
+    }
+    if (!reader.Get(out.mFormatVersion) || out.mFormatVersion != kFormatVersion) {
+        return Corrupt("world file: unsupported format version");
+    }
+    if (!reader.Get(out.mSchemaHash) || !reader.Get(out.mChunkSize) || !reader.Get(out.mWorldVersion)) {
+        return Corrupt("world file: truncated header");
+    }
+    uint32_t componentCount = 0;
+    if (!reader.Get(componentCount) || componentCount > kMaxComponentTypes) {
+        return Corrupt("world file: truncated component table");
+    }
+    out.mComponents.clear();
+    for (uint32_t i = 0; i < componentCount; ++i) {
+        uint32_t nameLength = 0;
+        if (!reader.Get(nameLength) || nameLength > 1024) {
+            return Corrupt("world file: truncated component table");
+        }
+        const std::byte* const name = reader.Take(nameLength);
+        WorldFileSummary::Component component{.mName = std::pmr::string(&out.mResource)};
+        if (name == nullptr || !reader.Get(component.mTypeId) || !reader.Get(component.mLayoutHash) ||
+            !reader.Get(component.mSize) || !reader.Get(component.mAlign)) {
+            return Corrupt("world file: truncated component table");
+        }
+        component.mName.assign(reinterpret_cast<const char*>(name),
+                               nameLength); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        out.mComponents.push_back(std::move(component));
+    }
+    if (!reader.Get(out.mEntityCapacity) || !reader.Skip(static_cast<size_t>(out.mEntityCapacity) * sizeof(uint32_t))) {
+        return Corrupt("world file: truncated entity table");
+    }
+    const std::byte* const alive = reader.Take(out.mEntityCapacity);
+    if (out.mEntityCapacity != 0 && alive == nullptr) {
+        return Corrupt("world file: truncated entity table");
+    }
+    out.mEntityCount = 0;
+    for (uint32_t index = 0; index < out.mEntityCapacity; ++index) {
+        out.mEntityCount += alive[index] != std::byte{0} ? 1 : 0;
+    }
+    uint32_t archetypeCount = 0;
+    if (!reader.Get(archetypeCount)) {
+        return Corrupt("world file: truncated archetype table");
+    }
+    out.mArchetypes.clear();
+    uint32_t located = 0;
+    for (uint32_t a = 0; a < archetypeCount; ++a) {
+        WorldFileSummary::Archetype archetype{.mTypes = std::pmr::vector<uint16_t>(&out.mResource)};
+        uint32_t typeCount = 0;
+        if (!reader.Get(typeCount) || typeCount > kMaxComponentTypes) {
+            return Corrupt("world file: truncated archetype");
+        }
+        for (uint32_t t = 0; t < typeCount; ++t) {
+            uint16_t value = 0;
+            if (!reader.Get(value) || value >= componentCount) {
+                return Corrupt("world file: archetype names an unknown component");
+            }
+            archetype.mTypes.push_back(value);
+        }
+        if (!reader.Get(archetype.mChunkCount)) {
+            return Corrupt("world file: truncated archetype");
+        }
+        for (uint32_t c = 0; c < archetype.mChunkCount; ++c) {
+            uint32_t rows = 0;
+            if (!reader.Get(rows) || !reader.Skip(out.mChunkSize)) {
+                return Corrupt("world file: truncated chunk");
+            }
+            archetype.mEntityCount += rows;
+        }
+        located += archetype.mEntityCount;
+        out.mArchetypes.push_back(std::move(archetype));
+    }
+    if (located != out.mEntityCount || !reader.AtEnd()) {
+        return Corrupt("world file: entity table and chunks disagree");
+    }
     return {};
 }
 

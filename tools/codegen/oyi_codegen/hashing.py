@@ -21,6 +21,12 @@ def type_id(qualified_name: str) -> int:
     return fnv1a64(qualified_name)
 
 
+def schema_hash(records) -> int:
+    """One number for everything a header declares: name, TypeId and layout hash of every record,
+    in declaration order. The build's schema hash (`oyi --version --json`) combines these."""
+    return fnv1a64("".join(f"{r.qualified_name}:{r.type_id:#x}:{r.layout_hash:#x};" for r in records))
+
+
 def layout_hash(record: RecordDecl) -> int:
     """Changes exactly when the memcpy layout changes (ADR-0013 snapshots key on it)."""
     parts = [f"size={record.size};align={record.align};"]

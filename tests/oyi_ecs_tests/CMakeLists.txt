@@ -20,3 +20,4 @@ oyi_add_test(oyi_ecs_tests
         WorldTests.cpp
     DEPS oyi::ecs oyi::ecs_fixture oyi::job oyi::core
 )
+target_compile_definitions(oyi_ecs_tests PRIVATE "OYI_TEST_OUTPUT_DIR=\"${OYI_TEST_OUTPUT_DIR}\"")
