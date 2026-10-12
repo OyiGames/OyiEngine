@@ -6,10 +6,12 @@
 #include <oyi_core/Schema.h>
 #include <oyi_ecs/Archetype.h>
 #include <oyi_ecs/ChunkView.h>
+#include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/Query.h>
 
 #include <cstdint>
 #include <memory_resource>
@@ -35,6 +37,11 @@ public:
         uint32_t mEntities   = 0;
         uint32_t mArchetypes = 0;
         uint32_t mChunks     = 0;
+    };
+
+    struct ReplayStats {
+        uint32_t mApplied = 0;
+        uint32_t mSkipped = 0; ///< commands aimed at dead entities, duplicate adds, missing removes
     };
 
     explicit World(core::Allocator& allocator) noexcept;
@@ -95,6 +102,15 @@ public:
     [[nodiscard]] const void* GetChunkComponent(EntityId entity, ComponentTypeIndex type) const noexcept;
     [[nodiscard]] void* GetChunkComponentForWrite(EntityId entity, ComponentTypeIndex type) noexcept;
 
+    // --- sync point (ADR-0008) ------------------------------------------------------------------
+
+    /// Applies every command of every buffer in one deterministic order: ascending sort key, then
+    /// buffer order, then recording order. Commands aimed at entities that are dead by the time
+    /// they run are skipped and counted. The buffers are cleared afterwards.
+    [[nodiscard]] ReplayStats ReplayCommands(std::span<CommandBuffer* const> buffers) noexcept;
+    /// A full sync point: replay, then advance the world version for the next frame.
+    [[nodiscard]] ReplayStats SyncPoint(std::span<CommandBuffer* const> buffers) noexcept;
+
     // --- change tracking ------------------------------------------------------------------------
 
     /// Writes stamp chunks with this version; the sync point advances it once per frame so that
@@ -119,7 +135,21 @@ public:
         }
     }
 
+    /// Visits every chunk of the archetypes a Query matches; the cache of the query is refreshed
+    /// first.
+    template <typename Fn>
+    void ForEachChunk(Query& query, Fn&& fn) {
+        for (const uint32_t index : query.GetMatches(*this)) {
+            Archetype& archetype = *mArchetypes[index];
+            for (uint32_t chunk = 0; chunk < archetype.GetChunkCount(); ++chunk) {
+                ChunkView view(archetype, chunk, mVersion);
+                fn(view);
+            }
+        }
+    }
+
     [[nodiscard]] const Archetype* FindArchetype(const ComponentMask& mask) const noexcept;
+    [[nodiscard]] const Archetype& GetArchetype(uint32_t index) const noexcept { return *mArchetypes[index]; }
     [[nodiscard]] uint32_t GetArchetypeCount() const noexcept { return static_cast<uint32_t>(mArchetypes.size()); }
     [[nodiscard]] Stats GetStats() const noexcept;
 

@@ -1,0 +1,247 @@
+#include <oyi_core/SystemAllocator.h>
+#include <oyi_ecs/ChunkView.h>
+#include <oyi_ecs/CommandBuffer.h>
+#include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/ComponentRegistry.h>
+#include <oyi_ecs/Entity.h>
+#include <oyi_ecs/World.h>
+#include <oyi_ecs_fixture/Components.gen.h> // IWYU pragma: keep
+#include <oyi_ecs_fixture/Components.h>
+#include <oyi_job/Job.h>
+#include <oyi_job/JobBuilder.h>
+#include <oyi_job/JobSystem.h>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <array>
+#include <cstdint>
+#include <deque>
+#include <initializer_list>
+#include <span>
+#include <vector>
+
+namespace {
+
+using oyi::core::SystemAllocator;
+using oyi::ecs::CommandBuffer;
+using oyi::ecs::ComponentMask;
+using oyi::ecs::ComponentTypeIndex;
+using oyi::ecs::EntityId;
+using oyi::ecs::PendingEntity;
+using oyi::ecs::World;
+using namespace oyi::ecs_fixture;
+
+struct Fixture {
+    SystemAllocator mAllocator;
+    World mWorld{mAllocator};
+    ComponentTypeIndex mPosition = *mWorld.GetComponents().Register<Position>();
+    ComponentTypeIndex mVelocity = *mWorld.GetComponents().Register<Velocity>();
+    ComponentTypeIndex mHealth   = *mWorld.GetComponents().Register<Health>();
+    ComponentTypeIndex mFrozen   = *mWorld.GetComponents().Register<Frozen>();
+};
+
+[[nodiscard]] ComponentMask MaskOf(std::initializer_list<ComponentTypeIndex> types) {
+    ComponentMask mask;
+    for (const ComponentTypeIndex type : types) {
+        mask.Set(type);
+    }
+    return mask;
+}
+
+} // namespace
+
+TEST_CASE("nothing recorded in a command buffer is visible before replay", "[ecs][commands]") {
+    Fixture f;
+    const EntityId victim = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    CommandBuffer commands(f.mAllocator);
+
+    const PendingEntity pending = commands.CreateEntity(MaskOf({f.mPosition, f.mHealth}));
+    CHECK(pending.IsValid());
+    commands.Set(pending, f.mPosition, Position{.mX = 1.0f, .mY = 2.0f, .mZ = 3.0f});
+    commands.DestroyEntity(victim);
+    commands.AddComponent(victim, f.mVelocity); // never applies: the entity is gone by then
+    CHECK(commands.GetCommandCount() == 4);
+    CHECK(commands.GetCreateCount() == 1);
+
+    // The recorder sees the old world until the sync point.
+    CHECK(f.mWorld.GetEntityCount() == 1);
+    CHECK(f.mWorld.IsAlive(victim));
+
+    const std::array<CommandBuffer*, 1> buffers{&commands};
+    const World::ReplayStats stats = f.mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
+    CHECK(stats.mApplied == 3);
+    CHECK(stats.mSkipped == 1);
+    CHECK(commands.IsEmpty());
+
+    CHECK_FALSE(f.mWorld.IsAlive(victim));
+    CHECK(f.mWorld.GetEntityCount() == 1);
+    uint32_t seen = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mPosition, f.mHealth}), ComponentMask{}, [&](oyi::ecs::ChunkView& view) {
+        for (const Position& position : view.Read<Position>(f.mPosition)) {
+            CHECK(position.mX == 1.0f);
+            CHECK(position.mZ == 3.0f);
+            ++seen;
+        }
+        for (const Health& health : view.Read<Health>(f.mHealth)) {
+            CHECK(health.mCurrent == 100); // defaulted, no Set recorded
+        }
+    });
+    CHECK(seen == 1);
+}
+
+TEST_CASE("every command kind replays and the ones aimed at dead entities are skipped", "[ecs][commands]") {
+    Fixture f;
+    const EntityId entity = *f.mWorld.CreateEntity(MaskOf({f.mPosition, f.mFrozen}));
+    const EntityId dead   = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    REQUIRE(f.mWorld.DestroyEntity(dead).has_value());
+
+    CommandBuffer commands(f.mAllocator);
+    commands.AddComponent(entity, f.mHealth);
+    commands.Set(entity, f.mHealth, Health{.mCurrent = 7, .mMax = 9, .mLastAttacker = dead});
+    commands.RemoveComponent(entity, f.mFrozen);
+    commands.SetComponentEnabled(entity, f.mPosition, false);
+    commands.AddComponent(entity, f.mHealth);                            // duplicate add: skipped
+    commands.RemoveComponent(entity, f.mVelocity);                       // never had it: skipped
+    commands.SetComponent(entity, f.mPosition, &entity, sizeof(entity)); // wrong size: skipped
+    commands.Set(dead, f.mPosition, Position{});                         // dead: skipped
+    commands.SetComponentEnabled(dead, f.mPosition, true);
+
+    const std::array<CommandBuffer*, 1> buffers{&commands};
+    const World::ReplayStats stats = f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(stats.mApplied == 4);
+    CHECK(stats.mSkipped == 5);
+
+    CHECK(f.mWorld.HasComponent(entity, f.mHealth));
+    CHECK(f.mWorld.Get<Health>(entity)->mCurrent == 7);
+    CHECK(f.mWorld.Get<Health>(entity)->mLastAttacker == dead);
+    CHECK_FALSE(f.mWorld.HasComponent(entity, f.mFrozen));
+    CHECK_FALSE(f.mWorld.IsComponentEnabled(entity, f.mPosition));
+}
+
+TEST_CASE("replay order follows the sort key, then buffer order, then recording order", "[ecs][commands]") {
+    Fixture f;
+    const EntityId entity = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    CommandBuffer late(f.mAllocator);
+    CommandBuffer early(f.mAllocator);
+    late.SetSortKey(2);
+    late.Set(entity, f.mPosition, Position{.mX = 20.0f, .mY = 0.0f, .mZ = 0.0f});
+    late.Set(entity, f.mPosition, Position{.mX = 21.0f, .mY = 0.0f, .mZ = 0.0f});
+    early.SetSortKey(1);
+    early.Set(entity, f.mPosition, Position{.mX = 10.0f, .mY = 0.0f, .mZ = 0.0f});
+
+    // Buffer order in the span does not matter when the keys differ.
+    const std::array<CommandBuffer*, 2> buffers{&late, &early};
+    (void)f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(f.mWorld.Get<Position>(entity)->mX == 21.0f);
+
+    // Equal keys: the span order decides, and recording order within a buffer is kept.
+    late.Set(entity, f.mPosition, Position{.mX = 5.0f, .mY = 0.0f, .mZ = 0.0f});
+    early.SetSortKey(2);
+    early.Set(entity, f.mPosition, Position{.mX = 6.0f, .mY = 0.0f, .mZ = 0.0f});
+    early.Set(entity, f.mPosition, Position{.mX = 7.0f, .mY = 0.0f, .mZ = 0.0f});
+    (void)f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(f.mWorld.Get<Position>(entity)->mX == 7.0f);
+}
+
+TEST_CASE("a pending entity can be referenced before it exists and is skipped if its creation failed",
+          "[ecs][commands]") {
+    Fixture f;
+    CommandBuffer commands(f.mAllocator);
+    const PendingEntity a = commands.CreateEntity(MaskOf({f.mPosition}));
+    const PendingEntity b = commands.CreateEntity(ComponentMask{});
+    commands.AddComponent(b, f.mHealth);
+    commands.Set(b, f.mHealth, Health{.mCurrent = 1, .mMax = 2, .mLastAttacker = EntityId::Invalid()});
+    commands.SetComponentEnabled(a, f.mPosition, false);
+    ComponentMask bogus;
+    bogus.Set(ComponentTypeIndex{.mValue = 99});
+    const PendingEntity broken = commands.CreateEntity(bogus); // unregistered type: creation fails
+    commands.AddComponent(broken, f.mPosition);
+
+    const std::array<CommandBuffer*, 1> buffers{&commands};
+    const World::ReplayStats stats = f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(stats.mApplied == 5);
+    CHECK(stats.mSkipped == 2);
+    CHECK(f.mWorld.GetEntityCount() == 2);
+
+    uint32_t healthy = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mHealth}), ComponentMask{}, [&](oyi::ecs::ChunkView& view) {
+        for (const Health& health : view.Read<Health>(f.mHealth)) {
+            CHECK(health.mCurrent == 1);
+            ++healthy;
+        }
+    });
+    CHECK(healthy == 1);
+    f.mWorld.ForEachChunk(MaskOf({f.mPosition}), ComponentMask{}, [&](oyi::ecs::ChunkView& view) {
+        REQUIRE(view.GetCount() == 1);
+        CHECK_FALSE(view.IsEnabled(0, f.mPosition));
+    });
+}
+
+TEST_CASE("commands recorded by parallel jobs replay to the same result every time", "[ecs][commands][job]") {
+    Fixture f;
+    constexpr uint32_t kEntities = 64;
+    constexpr uint32_t kJobs     = 8;
+    std::vector<EntityId> entities;
+    entities.reserve(kEntities);
+    for (uint32_t i = 0; i < kEntities; ++i) {
+        entities.push_back(*f.mWorld.CreateEntity(MaskOf({f.mPosition})));
+    }
+
+    struct Recorder {
+        std::vector<EntityId>* mEntities = nullptr;
+        CommandBuffer* mBuffer           = nullptr;
+        ComponentTypeIndex mPosition;
+        uint32_t mJob = 0;
+
+        static void Run(oyi::job::JobContext& /*context*/, void* data) {
+            auto* const self = static_cast<Recorder*>(data);
+            self->mBuffer->SetSortKey(self->mJob);
+            for (uint32_t i = 0; i < self->mEntities->size(); ++i) {
+                // Every job writes every entity; only the highest sort key may win.
+                self->mBuffer->Set(
+                    (*self->mEntities)[i], self->mPosition,
+                    Position{.mX = static_cast<float>(self->mJob), .mY = static_cast<float>(i), .mZ = 0.0f});
+            }
+        }
+    };
+
+    const auto runOnce = [&] {
+        oyi::job::JobSystem jobs(
+            f.mAllocator,
+            oyi::job::JobSystem::Config{.mWorkerCount = 3, .mMaxJobs = 64, .mMaxCounters = 16, .mSpinIterations = 8});
+        std::vector<CommandBuffer*> buffers;
+        buffers.reserve(kJobs);
+        std::array<Recorder, kJobs> recorders;
+        std::deque<CommandBuffer> storage; // CommandBuffer is not movable; deque never relocates
+        for (uint32_t j = 0; j < kJobs; ++j) {
+            storage.emplace_back(f.mAllocator);
+        }
+        const oyi::job::CounterId done = jobs.CreateCounter();
+        {
+            oyi::job::JobBuilder builder(jobs, "record", oyi::job::JobPriority::Critical,
+                                         oyi::job::CounterId::Invalid(), done, oyi::job::JobBuilder::Fence::None);
+            for (uint32_t j = 0; j < kJobs; ++j) {
+                recorders[j] =
+                    Recorder{.mEntities = &entities, .mBuffer = &storage[j], .mPosition = f.mPosition, .mJob = j};
+                REQUIRE(builder.DispatchJob("record", &Recorder::Run, &recorders[j]).has_value());
+            }
+        }
+        jobs.WaitForCounter(done);
+        jobs.ReleaseCounter(done);
+        // Buffers are handed over in an order unrelated to the jobs' completion order.
+        for (uint32_t j = 0; j < kJobs; ++j) {
+            buffers.push_back(&storage[(j * 5) % kJobs]);
+        }
+        const World::ReplayStats stats = f.mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
+        CHECK(stats.mApplied == kEntities * kJobs);
+        for (uint32_t i = 0; i < kEntities; ++i) {
+            const auto* const position = f.mWorld.Get<Position>(entities[i]);
+            REQUIRE(position != nullptr);
+            CHECK(position->mX == static_cast<float>(kJobs - 1));
+            CHECK(position->mY == static_cast<float>(i));
+        }
+    };
+    for (int round = 0; round < 5; ++round) {
+        runOnce();
+    }
+}

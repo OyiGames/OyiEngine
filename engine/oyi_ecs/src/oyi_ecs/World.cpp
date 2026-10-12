@@ -2,6 +2,7 @@
 #include <oyi_core/Expected.h>
 #include <oyi_ecs/Archetype.h>
 #include <oyi_ecs/ChunkLayout.h>
+#include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
@@ -11,8 +12,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <memory_resource>
 #include <span>
 #include <utility>
+#include <vector>
 
 namespace oyi::ecs {
 
@@ -234,6 +238,96 @@ void* World::GetChunkComponentForWrite(EntityId entity, ComponentTypeIndex type)
     }
     archetype.SetVersion(row.mChunk, component->mSlot, mVersion);
     return archetype.GetChunkComponent(row.mChunk, *component);
+}
+
+// --- sync point -------------------------------------------------------------------------------
+
+// pmr containers report exhaustion through MemoryResource, which terminates; they never throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+World::ReplayStats World::ReplayCommands(std::span<CommandBuffer* const> buffers) noexcept {
+    struct Ref {
+        uint64_t mSortKey = 0;
+        uint32_t mBuffer  = 0;
+        uint32_t mCommand = 0;
+    };
+    std::pmr::vector<Ref> order(&mResource);
+    std::pmr::vector<std::pmr::vector<EntityId>> created(&mResource);
+    for (uint32_t b = 0; b < buffers.size(); ++b) {
+        const CommandBuffer& buffer = *buffers[b];
+        for (uint32_t c = 0; c < buffer.mCommands.size(); ++c) {
+            order.push_back(Ref{.mSortKey = buffer.mCommands[c].mSortKey, .mBuffer = b, .mCommand = c});
+        }
+        // The outer pmr vector hands its resource to the inner one (uses-allocator construction).
+        created.emplace_back(buffer.mCreateMasks.size(), EntityId::Invalid());
+    }
+    // Gathering preserved buffer order and recording order; a stable sort by key keeps them as the
+    // tie-breakers.
+    std::ranges::stable_sort(order, [](const Ref& a, const Ref& b) { return a.mSortKey < b.mSortKey; });
+
+    ReplayStats stats;
+    for (const Ref& ref : order) {
+        const CommandBuffer& buffer           = *buffers[ref.mBuffer];
+        const CommandBuffer::Command& command = buffer.mCommands[ref.mCommand];
+        if (command.mOp == CommandBuffer::Op::Create) {
+            const core::Expected<EntityId> entity = CreateEntity(buffer.mCreateMasks[command.mPending.mIndex]);
+            if (entity.has_value()) {
+                created[ref.mBuffer][command.mPending.mIndex] = *entity;
+                ++stats.mApplied;
+            } else {
+                ++stats.mSkipped;
+            }
+            continue;
+        }
+        const EntityId target =
+            command.mPending.IsValid() ? created[ref.mBuffer][command.mPending.mIndex] : command.mEntity;
+        if (!mEntities.IsAlive(target)) {
+            ++stats.mSkipped;
+            continue;
+        }
+        bool applied = false;
+        switch (command.mOp) {
+        case CommandBuffer::Op::Destroy:
+            applied = DestroyEntity(target).has_value();
+            break;
+        case CommandBuffer::Op::Add:
+            applied = AddComponent(target, command.mType).has_value();
+            break;
+        case CommandBuffer::Op::Remove:
+            applied = RemoveComponent(target, command.mType).has_value();
+            break;
+        case CommandBuffer::Op::Set: {
+            void* const component = GetComponentForWrite(target, command.mType);
+            if (component != nullptr && mComponents.GetInfo(command.mType).mSize == command.mPayloadSize) {
+                std::memcpy(component, buffer.mPayload.data() + command.mPayloadOffset, command.mPayloadSize);
+                applied = true;
+            }
+            break;
+        }
+        case CommandBuffer::Op::Enable:
+            if (HasComponent(target, command.mType)) {
+                SetComponentEnabled(target, command.mType, command.mFlag);
+                applied = true;
+            }
+            break;
+        case CommandBuffer::Op::Create:
+            break;
+        }
+        if (applied) {
+            ++stats.mApplied;
+        } else {
+            ++stats.mSkipped;
+        }
+    }
+    for (CommandBuffer* const buffer : buffers) {
+        buffer->Clear();
+    }
+    return stats;
+}
+
+World::ReplayStats World::SyncPoint(std::span<CommandBuffer* const> buffers) noexcept {
+    const ReplayStats stats = ReplayCommands(buffers);
+    AdvanceVersion();
+    return stats;
 }
 
 World::Stats World::GetStats() const noexcept {
