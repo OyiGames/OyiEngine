@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <memory_resource>
 #include <span>
 #include <utility>
 #include <vector>
