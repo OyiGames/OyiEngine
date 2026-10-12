@@ -125,16 +125,17 @@ struct Defender {
 [[nodiscard]] SystemDesc Describe(std::string_view name, Phase phase, ComponentMask read, ComponentMask write,
                                   MessageMask sends, MessageMask receives, oyi::ecs::SystemFunction function,
                                   void* data) {
-    return SystemDesc{.mName     = name,
-                      .mPhase    = phase,
-                      .mRead     = read,
-                      .mWrite    = write,
-                      .mExclude  = ComponentMask{},
-                      .mOptional = ComponentMask{},
-                      .mSends    = sends,
-                      .mReceives = receives,
-                      .mFunction = function,
-                      .mData     = data};
+    return SystemDesc{.mName       = name,
+                      .mPhase      = phase,
+                      .mRead       = read,
+                      .mWrite      = write,
+                      .mExclude    = ComponentMask{},
+                      .mOptional   = ComponentMask{},
+                      .mSends      = sends,
+                      .mReceives   = receives,
+                      .mMainThread = false,
+                      .mFunction   = function,
+                      .mData       = data};
 }
 
 } // namespace

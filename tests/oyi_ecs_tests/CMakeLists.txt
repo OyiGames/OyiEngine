@@ -6,6 +6,7 @@ oyi_add_test(oyi_ecs_tests
         CommandBufferTests.cpp
         ComponentMaskTests.cpp
         EntityRegistryTests.cpp
+        MainThreadSystemTests.cpp
         MessageTests.cpp
         QueryTests.cpp
         ScheduleTests.cpp

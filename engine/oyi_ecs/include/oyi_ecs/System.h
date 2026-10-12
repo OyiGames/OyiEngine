@@ -81,6 +81,10 @@ struct SystemDesc {
     ComponentMask mOptional;
     MessageMask mSends;    ///< message types this system may send (ADR-0007: MessageSender<M>)
     MessageMask mReceives; ///< message types queued for this system
+    /// Runs on the thread that calls RunPhase instead of on a worker (ADR-0006: the managed
+    /// system group). Ordered and conflict-checked like any other system; the main thread runs it
+    /// as soon as its predecessors are done and helps with jobs while it waits.
+    bool mMainThread;
     SystemFunction mFunction;
     void* mData; ///< handed back through SystemContext::GetData
 };

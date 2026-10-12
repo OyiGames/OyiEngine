@@ -333,9 +333,24 @@ core::Result Schedule::RunPhase(Phase phase, job::JobSystem& jobs) noexcept {
             record.mRunVersion = base + used;
             record.mDone       = jobs.CreateCounter();
             OYI_CHECK(record.mDone.IsValid(), "Schedule: counter pool exhausted");
+            if (record.mDesc.mMainThread) {
+                // Held by the main thread until it has run the system below.
+                jobs.IncrementCounter(record.mDone);
+            }
         }
         for (const SystemId system : order) {
             SystemRecord& record = *mSystems[system.mValue];
+            if (record.mDesc.mMainThread) {
+                // Not a job: the main thread runs it after this loop; only its completion joins
+                // the phase counter.
+                const job::JobDesc finish{.mName     = record.mDesc.mName,
+                                          .mFunction = nullptr,
+                                          .mData     = nullptr,
+                                          .mPriority = job::JobPriority::Critical};
+                const core::Result spliced = jobs.RunJob(finish, record.mDone, phaseDone);
+                OYI_CHECK(spliced.has_value(), "Schedule: job pool exhausted");
+                continue;
+            }
             // One predecessor: wait on it directly. Several: join them through empty jobs.
             job::CounterId waitFor = job::CounterId::Invalid();
             job::CounterId join    = job::CounterId::Invalid();
@@ -370,6 +385,19 @@ core::Result Schedule::RunPhase(Phase phase, job::JobSystem& jobs) noexcept {
                 jobs.ReleaseCounter(join);
             }
         }
+    }
+    // Early dispatch, late wait (ADR-0007): the jobs are in flight; the main thread now runs its
+    // own systems in order, helping with jobs whenever it has to wait for a predecessor.
+    for (const SystemId system : order) {
+        SystemRecord& record = *mSystems[system.mValue];
+        if (!record.mDesc.mMainThread) {
+            continue;
+        }
+        for (const SystemId predecessor : record.mPredecessors) {
+            jobs.WaitForCounter(mSystems[predecessor.mValue]->mDone);
+        }
+        RunSystem(record, record.mRunVersion, jobs.GetMainFrameAllocator());
+        jobs.DecrementCounter(record.mDone);
     }
     jobs.WaitForCounter(phaseDone);
     jobs.ReleaseCounter(phaseDone);
