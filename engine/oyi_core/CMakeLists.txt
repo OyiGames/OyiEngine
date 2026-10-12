@@ -1,13 +1,26 @@
 oyi_add_module(core
     PUBLIC_HEADERS
+        include/oyi_core/Allocator.h
         include/oyi_core/Annotations.h
         include/oyi_core/Assert.h
         include/oyi_core/EnumFlags.h
+        include/oyi_core/Expected.h
+        include/oyi_core/FrameAllocator.h
         include/oyi_core/Handle.h
+        include/oyi_core/LinearAllocator.h
+        include/oyi_core/Memory.h
+        include/oyi_core/MemoryResource.h
         include/oyi_core/Schema.h
+        include/oyi_core/SystemAllocator.h
+        include/oyi_core/TaggedHeap.h
         include/oyi_core/TypeId.h
         include/oyi_core/Version.h
     SOURCES
         src/oyi_core/Assert.cpp
+        src/oyi_core/FrameAllocator.cpp
+        src/oyi_core/LinearAllocator.cpp
+        src/oyi_core/MemoryResource.cpp
+        src/oyi_core/SystemAllocator.cpp
+        src/oyi_core/TaggedHeap.cpp
         src/oyi_core/Version.cpp
 )
