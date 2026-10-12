@@ -139,6 +139,7 @@ void TraceD(SystemContext& context) {
                       .mRead     = read,
                       .mWrite    = write,
                       .mExclude  = ComponentMask{},
+                      .mOptional = ComponentMask{},
                       .mFunction = function,
                       .mData     = data};
 }

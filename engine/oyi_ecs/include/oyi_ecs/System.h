@@ -5,6 +5,7 @@
 #include <oyi_ecs/ChunkView.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/World.h>
 
@@ -74,6 +75,9 @@ struct SystemDesc {
     ComponentMask mRead;
     ComponentMask mWrite;
     ComponentMask mExclude;
+    /// Types from mRead / mWrite that an archetype may lack; the query does not require them and
+    /// the system checks ChunkView::Has before touching them. They still count as access.
+    ComponentMask mOptional;
     SystemFunction mFunction;
     void* mData; ///< handed back through SystemContext::GetData
 };
@@ -132,6 +136,21 @@ public:
     [[nodiscard]] std::span<T> Write(ChunkView& view, ComponentTypeIndex type) noexcept {
         OYI_ASSERT(CanWrite(type), "system writes a component type it did not declare");
         return view.Write<T>(type);
+    }
+
+    /// Random access by entity (ADR-0007: Query / ComponentLookup). Declared like any other
+    /// access; nullptr for a dead entity or a missing component. Parallel-unfriendly: keep it to
+    /// hierarchies and lookups, never to the hot loop over a chunk.
+    template <typename T>
+    [[nodiscard]] const T* Lookup(ComponentTypeIndex type, EntityId entity) const noexcept {
+        OYI_ASSERT(CanRead(type), "system looks up a component type it did not declare");
+        return static_cast<const T*>(mWorld.GetComponent(entity, type));
+    }
+
+    template <typename T>
+    [[nodiscard]] T* LookupForWrite(ComponentTypeIndex type, EntityId entity) noexcept {
+        OYI_ASSERT(CanWrite(type), "system writes a component type it did not declare");
+        return static_cast<T*>(mWorld.GetComponentForWrite(entity, type, mVersion));
     }
 
 private:

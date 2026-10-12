@@ -79,8 +79,12 @@ public:
     /// nullptr when the entity is dead, lacks the type, or the type is a tag or chunk component.
     /// Pointers are invalidated by any structural change.
     [[nodiscard]] const void* GetComponent(EntityId entity, ComponentTypeIndex type) const noexcept;
-    /// Same as GetComponent and marks the type as changed in the entity's chunk.
-    [[nodiscard]] void* GetComponentForWrite(EntityId entity, ComponentTypeIndex type) noexcept;
+    /// Same as GetComponent and marks the type as changed in the entity's chunk, stamping the
+    /// chunk with the world version or with `version` (a system running under its own version).
+    [[nodiscard]] void* GetComponentForWrite(EntityId entity, ComponentTypeIndex type) noexcept {
+        return GetComponentForWrite(entity, type, mVersion);
+    }
+    [[nodiscard]] void* GetComponentForWrite(EntityId entity, ComponentTypeIndex type, uint32_t version) noexcept;
 
     template <typename T>
     [[nodiscard]] const T* Get(EntityId entity) const noexcept {
