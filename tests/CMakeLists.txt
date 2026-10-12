@@ -3,6 +3,7 @@ include(Catch)
 
 add_subdirectory(oyi_platform_tests)
 add_subdirectory(oyi_core_tests)
+add_subdirectory(oyi_asset_tests)
 add_subdirectory(oyi_job_tests)
 add_subdirectory(oyi_ecs_tests)
 add_subdirectory(oyi_transform_tests)
