@@ -9,6 +9,8 @@ oyi_add_module(ecs
         include/oyi_ecs/Entity.h
         include/oyi_ecs/EntityRegistry.h
         include/oyi_ecs/Query.h
+        include/oyi_ecs/Schedule.h
+        include/oyi_ecs/System.h
         include/oyi_ecs/World.h
     SOURCES
         src/oyi_ecs/Archetype.cpp
@@ -17,6 +19,7 @@ oyi_add_module(ecs
         src/oyi_ecs/ComponentRegistry.cpp
         src/oyi_ecs/EntityRegistry.cpp
         src/oyi_ecs/Query.cpp
+        src/oyi_ecs/Schedule.cpp
         src/oyi_ecs/World.cpp
     DEPS oyi::core oyi::job
 )

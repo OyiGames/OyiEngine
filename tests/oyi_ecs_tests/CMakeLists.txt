@@ -7,6 +7,7 @@ oyi_add_test(oyi_ecs_tests
         ComponentMaskTests.cpp
         EntityRegistryTests.cpp
         QueryTests.cpp
+        ScheduleTests.cpp
         WorldTests.cpp
     DEPS oyi::ecs oyi::ecs_fixture oyi::job oyi::core
 )

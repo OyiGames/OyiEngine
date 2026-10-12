@@ -117,6 +117,9 @@ public:
     /// "changed since the version I last ran with" works for every system.
     [[nodiscard]] uint32_t GetVersion() const noexcept { return mVersion; }
     void AdvanceVersion() noexcept { ++mVersion; }
+    /// Skips `count` versions: a schedule gives every system of a phase its own version so that
+    /// "changed since my last run" also sees writes by systems that ran later in the same phase.
+    void AdvanceVersion(uint32_t count) noexcept { mVersion += count; }
 
     // --- iteration ------------------------------------------------------------------------------
 
@@ -136,16 +139,21 @@ public:
     }
 
     /// Visits every chunk of the archetypes a Query matches; the cache of the query is refreshed
-    /// first.
+    /// first. Writes through the views are stamped with `version`.
     template <typename Fn>
-    void ForEachChunk(Query& query, Fn&& fn) {
+    void ForEachChunk(Query& query, uint32_t version, Fn&& fn) {
         for (const uint32_t index : query.GetMatches(*this)) {
             Archetype& archetype = *mArchetypes[index];
             for (uint32_t chunk = 0; chunk < archetype.GetChunkCount(); ++chunk) {
-                ChunkView view(archetype, chunk, mVersion);
+                ChunkView view(archetype, chunk, version);
                 fn(view);
             }
         }
+    }
+
+    template <typename Fn>
+    void ForEachChunk(Query& query, Fn&& fn) {
+        ForEachChunk(query, mVersion, fn);
     }
 
     [[nodiscard]] const Archetype* FindArchetype(const ComponentMask& mask) const noexcept;
