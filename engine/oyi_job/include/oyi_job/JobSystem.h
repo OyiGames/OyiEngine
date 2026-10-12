@@ -91,6 +91,9 @@ public:
     void FreeFrame(core::MemoryTag tag) noexcept;
     /// Frame memory for main-thread code; same tag discipline as the workers.
     [[nodiscard]] core::FrameAllocator& GetMainFrameAllocator() noexcept;
+    /// The calling thread's frame allocator: the running job's inside a job, the main thread's on
+    /// the main thread. Other threads have none and must not call this.
+    [[nodiscard]] core::FrameAllocator& GetCurrentFrameAllocator() noexcept;
     [[nodiscard]] core::TaggedHeap::Stats GetFrameHeapStats() const noexcept;
 
     [[nodiscard]] Stats GetStats() const noexcept;

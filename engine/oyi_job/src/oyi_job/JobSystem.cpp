@@ -342,8 +342,10 @@ JobSystem::JobRecord* JobSystem::TryPop(JobPriority lowest) noexcept {
 }
 
 void JobSystem::Execute(JobRecord* job, Worker& worker) noexcept {
-    JobContext context{
-        .mWorkerIndex = worker.mIndex, .mFrameAllocator = worker.mFrameAllocator, .mJobName = job->mDesc.mName};
+    JobContext context{.mWorkerIndex    = worker.mIndex,
+                       .mFrameAllocator = worker.mFrameAllocator,
+                       .mJobName        = job->mDesc.mName,
+                       .mCompletion     = job->mAccumulate};
     const JobContext* const previous = gCurrentContext;
     gCurrentContext                  = &context;
     job->mDesc.mFunction(context, job->mDesc.mData);
@@ -435,6 +437,14 @@ void JobSystem::FreeFrame(core::MemoryTag tag) noexcept {
 
 core::FrameAllocator& JobSystem::GetMainFrameAllocator() noexcept {
     return mWorkers[mConfig.mWorkerCount].mFrameAllocator;
+}
+
+core::FrameAllocator& JobSystem::GetCurrentFrameAllocator() noexcept {
+    if (gCurrentContext != nullptr) {
+        return gCurrentContext->mFrameAllocator;
+    }
+    OYI_ASSERT(std::this_thread::get_id() == mMainThreadId, "no frame allocator on this thread");
+    return GetMainFrameAllocator();
 }
 
 core::TaggedHeap::Stats JobSystem::GetFrameHeapStats() const noexcept {
