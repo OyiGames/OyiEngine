@@ -34,7 +34,7 @@ constexpr uint32_t kMaxDepth = 64; ///< deeper chains are treated as broken (a c
 }
 
 /// Composes TRS into `out` for every row of the chunk; Rotation and Scale are optional columns.
-void ComposeChunk(ecs::SystemContext& context, ecs::ChunkView& view, const TransformTypes& types,
+void ComposeChunk(const ecs::SystemContext& context, const ecs::ChunkView& view, const TransformTypes& types,
                   std::span<float> out) noexcept {
     const std::span<const Translation> translations = context.Read<Translation>(view, types.mTranslation);
     const std::span<const Rotation> rotations =
