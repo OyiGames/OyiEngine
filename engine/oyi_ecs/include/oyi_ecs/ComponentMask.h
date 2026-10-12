@@ -70,6 +70,15 @@ public:
         return false;
     }
 
+    /// The types in both masks.
+    [[nodiscard]] constexpr TypeMask And(const TypeMask& other) const noexcept {
+        TypeMask result;
+        for (size_t i = 0; i < kWordCount; ++i) {
+            result.mWords[i] = mWords[i] & other.mWords[i];
+        }
+        return result;
+    }
+
     [[nodiscard]] constexpr TypeMask With(Index type) const noexcept {
         TypeMask copy = *this;
         copy.Set(type);

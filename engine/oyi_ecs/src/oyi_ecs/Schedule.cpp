@@ -7,6 +7,7 @@
 #include <oyi_ecs/Firewall.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
+#include <oyi_ecs/Resource.h>
 #include <oyi_ecs/Schedule.h>
 #include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/System.h>
@@ -15,6 +16,7 @@
 #include <oyi_job/Job.h>
 #include <oyi_job/JobSystem.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -35,7 +37,18 @@ namespace {
 }
 
 [[nodiscard]] bool Conflicts(const SystemDesc& a, const SystemDesc& b) noexcept {
-    return a.mWrite.Intersects(b.mWrite) || a.mWrite.Intersects(b.mRead) || b.mWrite.Intersects(a.mRead);
+    return a.mWrite.Intersects(b.mWrite) || a.mWrite.Intersects(b.mRead) || b.mWrite.Intersects(a.mRead) ||
+           a.mWriteResources.Intersects(b.mWriteResources) || a.mWriteResources.Intersects(b.mReadResources) ||
+           b.mWriteResources.Intersects(a.mReadResources);
+}
+
+/// Conflicts on a resource the schedule orders by itself (ResourceOrdering::Automatic).
+[[nodiscard]] bool ConflictsAutomatically(const SystemDesc& a, const SystemDesc& b,
+                                          const ResourceMask& automatic) noexcept {
+    const ResourceMask aWrites = a.mWriteResources.And(automatic);
+    const ResourceMask bWrites = b.mWriteResources.And(automatic);
+    return aWrites.Intersects(b.mWriteResources) || aWrites.Intersects(b.mReadResources) ||
+           bWrites.Intersects(a.mReadResources);
 }
 
 } // namespace
@@ -122,13 +135,9 @@ core::Result Schedule::AddOrder(SystemId before, SystemId after) noexcept {
 }
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
-core::Result Schedule::Build() noexcept {
-    if (mBuilt) {
-        return core::Fail(core::ErrorCode::InvalidState, "Schedule: already built");
-    }
+core::Result Schedule::Sort(std::span<uint8_t> reach) noexcept {
     const auto count = static_cast<uint32_t>(mSystems.size());
-    // reach[a * count + b] != 0 when a is ordered before b through explicit edges.
-    std::pmr::vector<uint8_t> reach(static_cast<size_t>(count) * count, uint8_t{0}, &mResource);
+    std::ranges::fill(reach, uint8_t{0});
     std::pmr::vector<uint32_t> indegree(count, 0, &mResource);
     std::pmr::vector<SystemId> ready(&mResource);
     for (uint32_t s = 0; s < count; ++s) {
@@ -190,6 +199,61 @@ core::Result Schedule::Build() noexcept {
             }
             return core::Fail(core::ErrorCode::InvalidState, "Schedule: the order edges form a cycle");
         }
+    }
+    return {};
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+core::Result Schedule::Build() noexcept {
+    if (mBuilt) {
+        return core::Fail(core::ErrorCode::InvalidState, "Schedule: already built");
+    }
+    const auto count = static_cast<uint32_t>(mSystems.size());
+    // reach[a * count + b] != 0 when a is ordered before b through edges.
+    std::pmr::vector<uint8_t> reach(static_cast<size_t>(count) * count, uint8_t{0}, &mResource);
+    const core::Result sorted = Sort(reach);
+    if (!sorted.has_value()) {
+        return sorted;
+    }
+    // Resources ordered automatically (ADR-0007: writers of the Environment serialize on their
+    // own): every still-unordered conflicting pair gets an edge in the order just derived, which
+    // cannot form a cycle, and the order is derived again so that the edges are in effect. Each
+    // system looks back for its nearest unordered conflict so that the edges form a chain.
+    const ResourceMask& automatic = mWorld.GetResources().GetAutomaticMask();
+    bool added                    = false;
+    for (const std::pmr::vector<SystemId>& order : mOrder) {
+        for (size_t j = 1; j < order.size(); ++j) {
+            for (size_t i = j; i-- > 0;) {
+                const uint32_t a = order[i].mValue;
+                const uint32_t b = order[j].mValue;
+                if (reach[(static_cast<size_t>(a) * count) + b] != 0 ||
+                    reach[(static_cast<size_t>(b) * count) + a] != 0 ||
+                    !ConflictsAutomatically(mSystems[a]->mDesc, mSystems[b]->mDesc, automatic)) {
+                    continue;
+                }
+                mSystems[b]->mPredecessors.push_back(order[i]);
+                added = true;
+                // Keep reach current so that only the edges that are needed get added.
+                for (uint32_t t = 0; t < count; ++t) {
+                    if (t != a && reach[(static_cast<size_t>(t) * count) + a] == 0) {
+                        continue;
+                    }
+                    for (uint32_t u = 0; u < count; ++u) {
+                        if (u == b || reach[(static_cast<size_t>(b) * count) + u] != 0) {
+                            reach[(static_cast<size_t>(t) * count) + u] = 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (added) {
+        const core::Result resorted = Sort(reach);
+        if (!resorted.has_value()) {
+            return resorted;
+        }
+    }
+    for (const std::pmr::vector<SystemId>& order : mOrder) {
         for (size_t i = 0; i < order.size(); ++i) {
             for (size_t j = i + 1; j < order.size(); ++j) {
                 const uint32_t a = order[i].mValue;
@@ -204,7 +268,8 @@ core::Result Schedule::Build() noexcept {
                         cleared.clear();
                     }
                     return core::Fail(core::ErrorCode::InvalidState,
-                                      "Schedule: two systems touch the same component without an explicit order");
+                                      "Schedule: two systems touch the same component or resource without an "
+                                      "explicit order");
                 }
             }
         }

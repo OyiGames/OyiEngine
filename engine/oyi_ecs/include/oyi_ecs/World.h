@@ -13,6 +13,7 @@
 #include <oyi_ecs/EntityRegistry.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
+#include <oyi_ecs/Resource.h>
 
 #include <cstdint>
 #include <memory_resource>
@@ -57,6 +58,13 @@ public:
     [[nodiscard]] const ComponentRegistry& GetComponents() const noexcept { return mComponents; }
     [[nodiscard]] MessageRegistry& GetMessages() noexcept { return mMessages; }
     [[nodiscard]] const MessageRegistry& GetMessages() const noexcept { return mMessages; }
+    [[nodiscard]] ResourceRegistry& GetResources() noexcept { return mResources; }
+    [[nodiscard]] const ResourceRegistry& GetResources() const noexcept { return mResources; }
+
+    /// The Environment singleton (ADR-0007), registered as resource 0 at construction. The main
+    /// loop writes it between phases; systems and windows reach it through their contexts.
+    [[nodiscard]] const Environment& GetEnvironment() const noexcept { return mEnvironment; }
+    [[nodiscard]] Environment& GetEnvironmentForWrite() noexcept { return mEnvironment; }
 
     // --- entities -------------------------------------------------------------------------------
 
@@ -178,6 +186,8 @@ private:
     core::MemoryResource mResource;
     ComponentRegistry mComponents;
     MessageRegistry mMessages;
+    ResourceRegistry mResources;
+    Environment mEnvironment;
     EntityRegistry mEntities;
     std::pmr::vector<Archetype*> mArchetypes;
     uint32_t mVersion = 1;

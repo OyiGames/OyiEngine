@@ -139,17 +139,19 @@ TEST_CASE("the schedule captures a snapshot at the end of the chosen phase", "[e
     };
     Bump bump{.mPosition = f.mPosition};
     REQUIRE(schedule
-                .AddSystem(SystemDesc{.mName       = "bump",
-                                      .mPhase      = Phase::FixedSimulation,
-                                      .mRead       = ComponentMask{},
-                                      .mWrite      = MaskOf({f.mPosition}),
-                                      .mExclude    = ComponentMask{},
-                                      .mOptional   = ComponentMask{},
-                                      .mSends      = oyi::ecs::MessageMask{},
-                                      .mReceives   = oyi::ecs::MessageMask{},
-                                      .mMainThread = false,
-                                      .mFunction   = &Bump::Run,
-                                      .mData       = &bump})
+                .AddSystem(SystemDesc{.mName           = "bump",
+                                      .mPhase          = Phase::FixedSimulation,
+                                      .mRead           = ComponentMask{},
+                                      .mWrite          = MaskOf({f.mPosition}),
+                                      .mExclude        = ComponentMask{},
+                                      .mOptional       = ComponentMask{},
+                                      .mSends          = oyi::ecs::MessageMask{},
+                                      .mReceives       = oyi::ecs::MessageMask{},
+                                      .mReadResources  = oyi::ecs::ResourceMask{},
+                                      .mWriteResources = oyi::ecs::ResourceMask{},
+                                      .mMainThread     = false,
+                                      .mFunction       = &Bump::Run,
+                                      .mData           = &bump})
                 .has_value());
     REQUIRE(schedule.Build().has_value());
     schedule.SetSnapshotCapture(&f.mSnapshot, MaskOf({f.mPosition}), Phase::FixedSimulation);

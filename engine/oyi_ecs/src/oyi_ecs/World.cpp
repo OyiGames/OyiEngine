@@ -1,4 +1,5 @@
 #include <oyi_core/Allocator.h>
+#include <oyi_core/Assert.h>
 #include <oyi_core/Expected.h>
 #include <oyi_ecs/Archetype.h>
 #include <oyi_ecs/ChunkLayout.h>
@@ -7,6 +8,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/Resource.h>
 #include <oyi_ecs/World.h>
 
 #include <algorithm>
@@ -22,7 +24,12 @@ namespace oyi::ecs {
 World::World(core::Allocator& allocator) noexcept : World(allocator, Config{}) {}
 
 World::World(core::Allocator& allocator, Config config) noexcept
-    : mAllocator(allocator), mConfig(config), mResource(allocator), mEntities(allocator), mArchetypes(&mResource) {}
+    : mAllocator(allocator), mConfig(config), mResource(allocator), mEntities(allocator), mArchetypes(&mResource) {
+    const core::Expected<ResourceTypeIndex> environment =
+        mResources.Register(kEnvironmentResourceName, mEnvironment, ResourceOrdering::Automatic);
+    OYI_CHECK(environment.has_value() && *environment == kEnvironmentResource,
+              "World: the Environment must be resource 0");
+}
 
 World::~World() {
     for (Archetype* const archetype : mArchetypes) {

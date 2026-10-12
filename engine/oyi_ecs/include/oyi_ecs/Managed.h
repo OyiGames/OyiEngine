@@ -7,6 +7,7 @@
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Message.h>
+#include <oyi_ecs/Resource.h>
 #include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/System.h>
 #include <oyi_ecs/World.h>
@@ -148,6 +149,18 @@ public:
     void Send(MessageTypeIndex type, EntityId target, const T& value) noexcept {
         mSystem.Send(type, target, value);
     }
+
+    template <typename T>
+    [[nodiscard]] const T* GetResource(ResourceTypeIndex type) const noexcept {
+        return mSystem.GetResource<T>(type);
+    }
+
+    template <typename T>
+    [[nodiscard]] T* GetResourceForWrite(ResourceTypeIndex type) noexcept {
+        return mSystem.GetResourceForWrite<T>(type);
+    }
+
+    [[nodiscard]] const Environment& GetEnvironment() const noexcept { return mSystem.GetEnvironment(); }
 
 private:
     SystemContext& mSystem;

@@ -54,17 +54,19 @@ constexpr JobSystem::Config kThreeWorkers{
 
 [[nodiscard]] SystemDesc Describe(std::string_view name, Phase phase, ComponentMask read, ComponentMask write,
                                   bool mainThread, oyi::ecs::SystemFunction function, void* data) {
-    return SystemDesc{.mName       = name,
-                      .mPhase      = phase,
-                      .mRead       = read,
-                      .mWrite      = write,
-                      .mExclude    = ComponentMask{},
-                      .mOptional   = ComponentMask{},
-                      .mSends      = MessageMask{},
-                      .mReceives   = MessageMask{},
-                      .mMainThread = mainThread,
-                      .mFunction   = function,
-                      .mData       = data};
+    return SystemDesc{.mName           = name,
+                      .mPhase          = phase,
+                      .mRead           = read,
+                      .mWrite          = write,
+                      .mExclude        = ComponentMask{},
+                      .mOptional       = ComponentMask{},
+                      .mSends          = MessageMask{},
+                      .mReceives       = MessageMask{},
+                      .mReadResources  = oyi::ecs::ResourceMask{},
+                      .mWriteResources = oyi::ecs::ResourceMask{},
+                      .mMainThread     = mainThread,
+                      .mFunction       = function,
+                      .mData           = data};
 }
 
 struct Fixture {
