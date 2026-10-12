@@ -53,7 +53,7 @@ function(oyi_add_module name)
     endif()
 
     if(NOT ARG_NO_INSTALL)
-        install(TARGETS ${target} oyi_build_settings
+        install(TARGETS ${target}
             EXPORT oyi-targets
             FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         )

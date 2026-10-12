@@ -36,6 +36,10 @@ foreach(_t IN ITEMS oyi_build_settings oyi_test_settings)
     )
 endforeach()
 
+# Exported once for every module that links it privately (their link interface carries
+# $<LINK_ONLY:oyi::build_settings>), so the SDK export set stays well formed.
+install(TARGETS oyi_build_settings EXPORT oyi-targets)
+
 # Engine core builds without RTTI. The no-exceptions policy is enforced by review and clang-tidy
 # until the _HAS_EXCEPTIONS/Catch2 interaction has been validated.
 target_compile_options(oyi_build_settings INTERFACE
