@@ -152,10 +152,9 @@ void Archetype::CopyRow(EntityLocation from, EntityLocation to) noexcept {
 }
 
 core::Expected<EntityLocation> Archetype::Allocate(EntityId entity, uint32_t version) noexcept {
-    if (mChunks.empty() || mChunks.back().mCount == mLayout.GetCapacity()) {
-        if (!AllocateChunk(version)) {
-            return core::Fail(core::ErrorCode::OutOfMemory, "Archetype: cannot allocate a chunk");
-        }
+    const bool needChunk = mChunks.empty() || mChunks.back().mCount == mLayout.GetCapacity();
+    if (needChunk && !AllocateChunk(version)) {
+        return core::Fail(core::ErrorCode::OutOfMemory, "Archetype: cannot allocate a chunk");
     }
     const auto chunk     = static_cast<uint32_t>(mChunks.size() - 1);
     const uint32_t index = mChunks[chunk].mCount;

@@ -30,16 +30,12 @@ public:
 
     constexpr ComponentMask() = default;
 
-    constexpr void Set(ComponentTypeIndex type) noexcept {
-        mWords[type.mValue / 64] |= uint64_t{1} << (type.mValue % 64);
-    }
+    constexpr void Set(ComponentTypeIndex type) noexcept { mWords[WordOf(type)] |= BitOf(type); }
 
-    constexpr void Clear(ComponentTypeIndex type) noexcept {
-        mWords[type.mValue / 64] &= ~(uint64_t{1} << (type.mValue % 64));
-    }
+    constexpr void Clear(ComponentTypeIndex type) noexcept { mWords[WordOf(type)] &= ~BitOf(type); }
 
     [[nodiscard]] constexpr bool Test(ComponentTypeIndex type) const noexcept {
-        return (mWords[type.mValue / 64] & (uint64_t{1} << (type.mValue % 64))) != 0;
+        return (mWords[WordOf(type)] & BitOf(type)) != 0;
     }
 
     [[nodiscard]] constexpr bool IsEmpty() const noexcept {
@@ -101,6 +97,14 @@ public:
     [[nodiscard]] constexpr bool operator==(const ComponentMask&) const noexcept = default;
 
 private:
+    // uint16_t promotes to int; keep the bit arithmetic unsigned throughout.
+    [[nodiscard]] static constexpr size_t WordOf(ComponentTypeIndex type) noexcept {
+        return static_cast<size_t>(type.mValue) / 64u;
+    }
+    [[nodiscard]] static constexpr uint64_t BitOf(ComponentTypeIndex type) noexcept {
+        return uint64_t{1} << (static_cast<uint32_t>(type.mValue) % 64u);
+    }
+
     std::array<uint64_t, kWordCount> mWords{};
 };
 

@@ -82,8 +82,10 @@ core::Result ParallelFor(JobBuilder& builder, std::string_view name, uint32_t co
         }
     }
 
-    // The epilogue (or an empty job) turns "all chunks done" into the step's completion, so the
-    // chain stays ordered even for zero elements.
+    // The epilogue (or an empty job) turns "all chunks done" into the step's completion. With no
+    // chunks nothing links the builder's entry to chunksDone, so the tail waits on the entry
+    // directly; that is what keeps the chain ordered for zero elements.
+    const CounterId tailWait = chunkCount == 0 ? entry : chunksDone;
     const CounterId stepDone = system.CreateCounter();
     if (!stepDone.IsValid()) {
         builder.AdvanceChain(chunksDone);
@@ -103,7 +105,7 @@ core::Result ParallelFor(JobBuilder& builder, std::string_view name, uint32_t co
         tail.mFunction = &RunEpilogue;
         tail.mData     = task;
     }
-    const core::Result result = system.RunJob(tail, chunksDone, stepDone);
+    const core::Result result = system.RunJob(tail, tailWait, stepDone);
     if (!result.has_value()) {
         system.ReleaseCounter(stepDone);
         builder.AdvanceChain(chunksDone);
