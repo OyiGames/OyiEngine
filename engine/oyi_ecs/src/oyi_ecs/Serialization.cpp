@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <cstring>
 #include <expected>
-#include <memory_resource>
 #include <span>
 #include <string_view>
 #include <vector>
