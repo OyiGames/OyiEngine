@@ -55,7 +55,7 @@ TEST_CASE("a USD matrix becomes the same affine Compose builds from its TRS", "[
     std::array<double, 16> usd{};
     for (size_t row = 0; row < 3; ++row) {
         for (size_t col = 0; col < 3; ++col) {
-            usd[(row * 4) + col] = expected[(row * 3) + col];
+            usd[(row * 4) + col] = static_cast<double>(expected[(row * 3) + col]);
         }
     }
     usd[12] = 100.0;
