@@ -38,7 +38,7 @@ struct ProtectedCall {
 };
 
 int ProtectedTrampoline(lua_State* state) {
-    auto* const call = static_cast<ProtectedCall*>(lua_tolightuserdata(state, lua_upvalueindex(1)));
+    const auto* const call = static_cast<const ProtectedCall*>(lua_tolightuserdata(state, lua_upvalueindex(1)));
     call->mFunction(state, call->mData);
     return 0;
 }
@@ -162,6 +162,7 @@ ScriptVm::Stats ScriptVm::GetStats() const noexcept {
                  .mModuleCount = static_cast<uint32_t>(mModules.size())};
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 void ScriptVm::CaptureError(lua_State* state) noexcept {
     const char* const message = lua_tostring(state, -1);
     mLastError.assign(message != nullptr ? message : "oyi: unknown script error");

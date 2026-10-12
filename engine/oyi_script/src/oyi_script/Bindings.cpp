@@ -503,11 +503,11 @@ int Env(lua_State* state) {
     lua_setfield(state, -2, "frame");
     lua_pushnumber(state, static_cast<double>(environment.mSimulationTick));
     lua_setfield(state, -2, "tick");
-    lua_pushnumber(state, environment.mFixedStepSeconds);
+    lua_pushnumber(state, static_cast<double>(environment.mFixedStepSeconds));
     lua_setfield(state, -2, "fixed_step");
     lua_pushnumber(state, environment.mPresentationSeconds);
     lua_setfield(state, -2, "time");
-    lua_pushnumber(state, environment.mDeltaSeconds);
+    lua_pushnumber(state, static_cast<double>(environment.mDeltaSeconds));
     lua_setfield(state, -2, "delta");
     return 1;
 }
