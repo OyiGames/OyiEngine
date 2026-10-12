@@ -8,6 +8,7 @@ oyi_add_module(ecs
         include/oyi_ecs/ComponentRegistry.h
         include/oyi_ecs/Entity.h
         include/oyi_ecs/EntityRegistry.h
+        include/oyi_ecs/Managed.h
         include/oyi_ecs/Message.h
         include/oyi_ecs/Query.h
         include/oyi_ecs/Schedule.h
@@ -20,6 +21,7 @@ oyi_add_module(ecs
         src/oyi_ecs/CommandBuffer.cpp
         src/oyi_ecs/ComponentRegistry.cpp
         src/oyi_ecs/EntityRegistry.cpp
+        src/oyi_ecs/Managed.cpp
         src/oyi_ecs/Message.cpp
         src/oyi_ecs/Query.cpp
         src/oyi_ecs/Schedule.cpp
