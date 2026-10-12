@@ -4,6 +4,7 @@
 #include <oyi_core/SystemAllocator.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/Schedule.h>
 #include <oyi_ecs/System.h>
@@ -44,12 +45,16 @@ struct Schedule::SystemRecord {
         , mDesc(desc)
         , mQuery(allocator, Touched(desc), desc.mExclude)
         , mCommands(allocator)
+        , mOutbox(allocator)
+        , mInbox(allocator)
         , mPredecessors(resource) {}
 
     Schedule& mOwner;
     SystemDesc mDesc;
     Query mQuery;
     CommandBuffer mCommands;
+    MessageBuffer mOutbox;
+    MessageInbox mInbox;
     std::pmr::vector<SystemId> mPredecessors;
     uint32_t mOrderIndex  = 0; ///< position within the phase after Build
     uint32_t mLastVersion = 0;
@@ -228,10 +233,38 @@ void Schedule::RefreshQueries(Phase phase) noexcept {
 }
 
 void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept {
-    SystemContext context(mWorld, record.mQuery, record.mCommands, record.mDesc.mRead, record.mDesc.mWrite, version,
-                          record.mLastVersion, record.mDesc.mData, scratch);
+    SystemContext context(mWorld, record.mQuery, record.mCommands, record.mOutbox, record.mInbox, record.mDesc, version,
+                          record.mLastVersion, scratch);
     record.mDesc.mFunction(context);
     record.mLastVersion = version;
+    // Delivered messages are for one run only.
+    record.mInbox.Clear();
+}
+
+void Schedule::RouteMessages(Phase phase) noexcept {
+    // Senders in phase order, records in sending order, receivers in registration order: the
+    // queues come out the same whatever the workers did.
+    for (const SystemId sender : mOrder[static_cast<size_t>(phase)]) {
+        MessageBuffer& outbox = mSystems[sender.mValue]->mOutbox;
+        for (const MessageBuffer::Record& record : outbox.GetRecords()) {
+            const std::byte* const payload = outbox.GetPayload().data() + record.mPayloadOffset;
+            const ComponentMask* const targetMask =
+                record.mTarget.IsValid() ? mWorld.GetComponentMask(record.mTarget) : nullptr;
+            if (record.mTarget.IsValid() && targetMask == nullptr) {
+                continue; // the target died before the sync point
+            }
+            for (SystemRecord* const receiver : mSystems) {
+                if (!receiver->mDesc.mReceives.Test(record.mType)) {
+                    continue;
+                }
+                if (targetMask != nullptr && !receiver->mQuery.Matches(*targetMask)) {
+                    continue;
+                }
+                receiver->mInbox.Push(record.mType, record.mTarget, payload, record.mPayloadSize);
+            }
+        }
+        outbox.Clear();
+    }
 }
 
 void Schedule::RunSystemJob(job::JobContext& context, void* data) {
@@ -241,6 +274,7 @@ void Schedule::RunSystemJob(job::JobContext& context, void* data) {
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
+    RouteMessages(phase);
     mPhaseBuffers.clear();
     for (const SystemId system : mOrder[static_cast<size_t>(phase)]) {
         SystemRecord& record = *mSystems[system.mValue];

@@ -11,6 +11,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 
 #include <cstdint>
@@ -54,6 +55,8 @@ public:
 
     [[nodiscard]] ComponentRegistry& GetComponents() noexcept { return mComponents; }
     [[nodiscard]] const ComponentRegistry& GetComponents() const noexcept { return mComponents; }
+    [[nodiscard]] MessageRegistry& GetMessages() noexcept { return mMessages; }
+    [[nodiscard]] const MessageRegistry& GetMessages() const noexcept { return mMessages; }
 
     // --- entities -------------------------------------------------------------------------------
 
@@ -174,6 +177,7 @@ private:
     Config mConfig;
     core::MemoryResource mResource;
     ComponentRegistry mComponents;
+    MessageRegistry mMessages;
     EntityRegistry mEntities;
     std::pmr::vector<Archetype*> mArchetypes;
     uint32_t mVersion = 1;

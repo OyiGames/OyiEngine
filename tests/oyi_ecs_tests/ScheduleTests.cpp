@@ -140,6 +140,8 @@ void TraceD(SystemContext& context) {
                       .mWrite    = write,
                       .mExclude  = ComponentMask{},
                       .mOptional = ComponentMask{},
+                      .mSends    = oyi::ecs::MessageMask{},
+                      .mReceives = oyi::ecs::MessageMask{},
                       .mFunction = function,
                       .mData     = data};
 }

@@ -6,6 +6,7 @@
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
+#include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/World.h>
 
@@ -78,8 +79,17 @@ struct SystemDesc {
     /// Types from mRead / mWrite that an archetype may lack; the query does not require them and
     /// the system checks ChunkView::Has before touching them. They still count as access.
     ComponentMask mOptional;
+    MessageMask mSends;    ///< message types this system may send (ADR-0007: MessageSender<M>)
+    MessageMask mReceives; ///< message types queued for this system
     SystemFunction mFunction;
     void* mData; ///< handed back through SystemContext::GetData
+};
+
+/// The messages of one type waiting for a system: targets and payloads side by side.
+template <typename T>
+struct ReceivedMessages {
+    std::span<const EntityId> mTargets; ///< invalid id = broadcast
+    std::span<const T> mPayloads;
 };
 
 /// What a system sees while it runs. Component access goes through Read / Write so that the
@@ -87,26 +97,25 @@ struct SystemDesc {
 /// Structural changes go through GetCommands and apply at the end of the phase.
 class SystemContext {
 public:
-    SystemContext(World& world, Query& query, CommandBuffer& commands, const ComponentMask& read,
-                  const ComponentMask& write, uint32_t version, uint32_t lastVersion, void* data,
-                  core::Allocator& scratch) noexcept
+    SystemContext(World& world, Query& query, CommandBuffer& commands, MessageBuffer& outbox, const MessageInbox& inbox,
+                  const SystemDesc& desc, uint32_t version, uint32_t lastVersion, core::Allocator& scratch) noexcept
         : mWorld(world)
         , mQuery(query)
         , mCommands(commands)
-        , mRead(read)
-        , mWrite(write)
+        , mOutbox(outbox)
+        , mInbox(inbox)
+        , mDesc(desc)
         , mVersion(version)
         , mLastVersion(lastVersion)
-        , mData(data)
         , mScratch(scratch) {}
 
     [[nodiscard]] const World& GetWorld() const noexcept { return mWorld; }
     [[nodiscard]] CommandBuffer& GetCommands() noexcept { return mCommands; }
-    [[nodiscard]] void* GetData() const noexcept { return mData; }
+    [[nodiscard]] void* GetData() const noexcept { return mDesc.mData; }
 
     template <typename T>
     [[nodiscard]] T* GetData() const noexcept {
-        return static_cast<T*>(mData);
+        return static_cast<T*>(mDesc.mData);
     }
 
     /// Version this run stamps its writes with.
@@ -117,8 +126,27 @@ public:
     /// Per-run scratch memory: the worker's frame allocator when running on the job system.
     [[nodiscard]] core::Allocator& GetScratch() const noexcept { return mScratch; }
 
-    [[nodiscard]] bool CanRead(ComponentTypeIndex type) const noexcept { return mRead.Test(type) || mWrite.Test(type); }
-    [[nodiscard]] bool CanWrite(ComponentTypeIndex type) const noexcept { return mWrite.Test(type); }
+    [[nodiscard]] bool CanRead(ComponentTypeIndex type) const noexcept {
+        return mDesc.mRead.Test(type) || mDesc.mWrite.Test(type);
+    }
+    [[nodiscard]] bool CanWrite(ComponentTypeIndex type) const noexcept { return mDesc.mWrite.Test(type); }
+    [[nodiscard]] bool CanSend(MessageTypeIndex type) const noexcept { return mDesc.mSends.Test(type); }
+    [[nodiscard]] bool CanReceive(MessageTypeIndex type) const noexcept { return mDesc.mReceives.Test(type); }
+
+    /// Queues a message for the receivers of `type` whose query matches `target` (every receiver
+    /// when `target` is invalid). Delivered at the end of this phase, read on their next run.
+    template <typename T>
+    void Send(MessageTypeIndex type, EntityId target, const T& value) noexcept {
+        OYI_ASSERT(CanSend(type), "system sends a message type it did not declare");
+        mOutbox.Send(type, target, value);
+    }
+
+    /// The messages of `type` delivered since this system last ran.
+    template <typename T>
+    [[nodiscard]] ReceivedMessages<T> Received(MessageTypeIndex type) const noexcept {
+        OYI_ASSERT(CanReceive(type), "system reads a message type it did not declare");
+        return ReceivedMessages<T>{.mTargets = mInbox.Targets(type), .mPayloads = mInbox.Payloads<T>(type)};
+    }
 
     /// Visits every chunk the system's query matches. `fn` receives a ChunkView&.
     template <typename Fn>
@@ -157,11 +185,11 @@ private:
     World& mWorld;
     Query& mQuery;
     CommandBuffer& mCommands;
-    const ComponentMask& mRead;
-    const ComponentMask& mWrite;
+    MessageBuffer& mOutbox;
+    const MessageInbox& mInbox;
+    const SystemDesc& mDesc;
     uint32_t mVersion;
     uint32_t mLastVersion;
-    void* mData;
     core::Allocator& mScratch;
 };
 
