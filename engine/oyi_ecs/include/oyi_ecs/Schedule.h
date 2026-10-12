@@ -48,6 +48,7 @@ public:
     enum class AccessViolationKind : uint8_t {
         Undeclared, ///< a system touched a type outside its declared masks
         Unordered,  ///< two systems without an order edge touched the same chunk and one wrote
+        CrossChunk, ///< a chunk task touched another chunk for a type its system writes (Premark)
     };
 
     struct AccessViolation {
@@ -131,8 +132,14 @@ private:
     };
 
     struct SystemRecord;
+    struct TaskOwner;
+    struct ChunkTask;
 
     static void RunSystemJob(job::JobContext& context, void* data);
+    [[nodiscard]] static core::Result DispatchChunkTasks(void* owner, SystemContext& outer,
+                                                         ChunkTaskFunction function) noexcept;
+    static void RunChunkTask(SystemRecord& record, const ChunkTask& task, core::Allocator& scratch) noexcept;
+    static void RunChunkTasksJob(job::JobContext& context, void* data, uint32_t begin, uint32_t end);
     /// Derives the per-phase order from the current edges and fills `reach` (count x count).
     [[nodiscard]] core::Result Sort(std::span<uint8_t> reach) noexcept;
     void RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept;

@@ -173,6 +173,8 @@ public:
 
     [[nodiscard]] const Archetype* FindArchetype(const ComponentMask& mask) const noexcept;
     [[nodiscard]] const Archetype& GetArchetype(uint32_t index) const noexcept { return *mArchetypes[index]; }
+    /// For code that builds ChunkViews of its own (the schedule's chunk tasks).
+    [[nodiscard]] Archetype& GetArchetypeForWrite(uint32_t index) noexcept { return *mArchetypes[index]; }
     [[nodiscard]] uint32_t GetArchetypeCount() const noexcept { return static_cast<uint32_t>(mArchetypes.size()); }
     [[nodiscard]] Stats GetStats() const noexcept;
 
