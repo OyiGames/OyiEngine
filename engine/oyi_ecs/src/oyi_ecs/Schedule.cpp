@@ -2,6 +2,7 @@
 #include <oyi_core/Assert.h>
 #include <oyi_core/Expected.h>
 #include <oyi_core/SystemAllocator.h>
+#include <oyi_ecs/AccessLog.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Firewall.h>
@@ -62,6 +63,7 @@ struct Schedule::SystemRecord {
         , mCommands(allocator)
         , mOutbox(allocator)
         , mInbox(allocator)
+        , mAccesses(allocator)
         , mPredecessors(resource) {}
 
     Schedule& mOwner;
@@ -70,6 +72,7 @@ struct Schedule::SystemRecord {
     CommandBuffer mCommands;
     MessageBuffer mOutbox;
     MessageInbox mInbox;
+    AccessLog mAccesses;
     std::pmr::vector<SystemId> mPredecessors;
     uint32_t mOrderIndex  = 0; ///< position within the phase after Build
     uint32_t mLastVersion = 0;
@@ -88,7 +91,9 @@ Schedule::Schedule(core::Allocator& allocator, World& world) noexcept
              std::pmr::vector<SystemId>(&mResource), std::pmr::vector<SystemId>(&mResource)}
     , mPhaseBuffers(&mResource)
     , mWindowCommands(allocator)
-    , mWindowOutbox(allocator) {}
+    , mWindowOutbox(allocator)
+    , mReach(&mResource)
+    , mViolations(&mResource) {}
 
 Schedule::~Schedule() {
     for (SystemRecord* const record : mSystems) {
@@ -210,8 +215,9 @@ core::Result Schedule::Build() noexcept {
     }
     const auto count = static_cast<uint32_t>(mSystems.size());
     // reach[a * count + b] != 0 when a is ordered before b through edges.
-    std::pmr::vector<uint8_t> reach(static_cast<size_t>(count) * count, uint8_t{0}, &mResource);
-    const core::Result sorted = Sort(reach);
+    mReach.assign(static_cast<size_t>(count) * count, uint8_t{0});
+    const std::span<uint8_t> reach = mReach;
+    const core::Result sorted      = Sort(reach);
     if (!sorted.has_value()) {
         return sorted;
     }
@@ -304,6 +310,8 @@ void Schedule::RefreshQueries(Phase phase) noexcept {
 void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept {
     SystemContext context(mWorld, record.mQuery, record.mCommands, record.mOutbox, record.mInbox, record.mDesc, version,
                           record.mLastVersion, scratch);
+    record.mAccesses.Clear();
+    const AccessScope recording(mAccessMode != AccessCheckMode::Off ? &record.mAccesses : nullptr);
     record.mDesc.mFunction(context);
     record.mLastVersion = version;
     // Delivered messages are for one run only.
@@ -346,6 +354,7 @@ void Schedule::RunSystemJob(job::JobContext& context, void* data) {
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
+    ValidateAccesses(phase);
     RouteMessages(phase);
     mPhaseBuffers.clear();
     for (const SystemId system : mOrder[static_cast<size_t>(phase)]) {
@@ -384,6 +393,67 @@ core::Result Schedule::RunWindow(WindowFunction function, void* data) noexcept {
     std::array<CommandBuffer*, 1> buffers{&mWindowCommands};
     mLastWindowReplay = mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
     return {};
+}
+
+const AccessLog& Schedule::GetAccessLog(SystemId system) const noexcept {
+    OYI_ASSERT(system.mValue < mSystems.size(), "Schedule: unknown system");
+    return mSystems[system.mValue]->mAccesses;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+void Schedule::ValidateAccesses(Phase phase) noexcept {
+    mViolations.clear();
+    if (mAccessMode == AccessCheckMode::Off) {
+        return;
+    }
+    const std::span<const SystemId> order = mOrder[static_cast<size_t>(phase)];
+    const size_t count                    = mSystems.size();
+    // Every access against the declaration that the static half of the check relied on.
+    for (const SystemId system : order) {
+        const SystemRecord& record = *mSystems[system.mValue];
+        for (const AccessEntry& entry : record.mAccesses.GetEntries()) {
+            const bool declared = entry.mKind == AccessKind::Write
+                                      ? record.mDesc.mWrite.Test(entry.mType)
+                                      : record.mDesc.mRead.Test(entry.mType) || record.mDesc.mWrite.Test(entry.mType);
+            if (!declared) {
+                mViolations.push_back(AccessViolation{.mKind      = AccessViolationKind::Undeclared,
+                                                      .mFirst     = system,
+                                                      .mSecond    = SystemId::Invalid(),
+                                                      .mType      = entry.mType,
+                                                      .mAccess    = entry.mKind,
+                                                      .mArchetype = entry.mArchetype,
+                                                      .mChunk     = entry.mChunk});
+            }
+        }
+    }
+    // Every pair the graph did not order: they may have run side by side, so their tables must
+    // not overlap on a write (ADR-0019: compared at the join, timing ignored).
+    for (size_t i = 0; i < order.size(); ++i) {
+        for (size_t j = i + 1; j < order.size(); ++j) {
+            const uint32_t a = order[i].mValue;
+            const uint32_t b = order[j].mValue;
+            if (mReach[(static_cast<size_t>(a) * count) + b] != 0 ||
+                mReach[(static_cast<size_t>(b) * count) + a] != 0) {
+                continue;
+            }
+            const AccessEntry* const entry = mSystems[a]->mAccesses.FindConflict(mSystems[b]->mAccesses);
+            if (entry == nullptr) {
+                continue;
+            }
+            mViolations.push_back(AccessViolation{.mKind      = AccessViolationKind::Unordered,
+                                                  .mFirst     = order[i],
+                                                  .mSecond    = order[j],
+                                                  .mType      = entry->mType,
+                                                  .mAccess    = entry->mKind,
+                                                  .mArchetype = entry->mArchetype,
+                                                  .mChunk     = entry->mChunk});
+        }
+    }
+    if (mAccessMode == AccessCheckMode::Assert && !mViolations.empty()) {
+        core::ReportAssertionFailure("Schedule access checks",
+                                     "a system touched a chunk outside its declaration or beside an unordered "
+                                     "system; see Schedule::GetViolations");
+    }
 }
 
 void Schedule::SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept {

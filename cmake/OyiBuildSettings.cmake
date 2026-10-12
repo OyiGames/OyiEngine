@@ -33,6 +33,7 @@ foreach(_t IN ITEMS oyi_build_settings oyi_test_settings)
     )
     target_compile_definitions(${_t} INTERFACE
         "$<$<PLATFORM_ID:Windows>:NOMINMAX;WIN32_LEAN_AND_MEAN>"
+        "$<$<CONFIG:Debug>:OYI_ACCESS_CHECKS=1>" # ADR-0019: the runtime access checks, Debug only
     )
 endforeach()
 
