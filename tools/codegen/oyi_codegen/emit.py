@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 
-from oyi_codegen import __version__
+from oyi_codegen import __version__, hashing
 from oyi_codegen.model import FieldDecl, FieldKind, HeaderSchema, RecordDecl
 
 _CORE = "::oyi::core::"
@@ -92,6 +92,18 @@ def render_header(schema: HeaderSchema) -> str:
         if ns_text:
             out.append(f"}} // namespace {ns_text}")
             out.append("")
+    # The header's schema hash, in the namespace of its first record (ADR-0011: schema hash).
+    if schema.records:
+        owner = "::".join(schema.records[0].namespace)
+        if owner:
+            out.append(f"namespace {owner} {{")
+            out.append("")
+        out.append("/// FNV-1a over the name, TypeId and layout hash of every record in this header.")
+        out.append(f"inline constexpr unsigned long long kSchemaHash = {hashing.schema_hash(schema.records):#018x}ull;")
+        out.append("")
+        if owner:
+            out.append(f"}} // namespace {owner}")
+            out.append("")
     components = list(schema.records)
     if components:
         out.append("namespace oyi::core {")
@@ -130,6 +142,7 @@ def render_json(schema: HeaderSchema) -> str:
     doc = {
         "generator": f"oyi_codegen {__version__}",
         "header": schema.header,
+        "schemaHash": f"{hashing.schema_hash(schema.records):#018x}",
         "records": [
             {
                 "name": r.qualified_name,

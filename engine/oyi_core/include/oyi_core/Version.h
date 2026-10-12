@@ -25,8 +25,9 @@ struct Version {
 /// Formats a version as "major.minor.patch".
 [[nodiscard]] std::string ToString(const Version& version);
 
-/// JSON line used by `oyi --version --json`: {"engine":"0.1.0","protocol":0,"schemaHash":"0"}.
-[[nodiscard]] std::string GetVersionJson();
+/// JSON line used by `oyi --version --json`: {"engine":"0.1.0","protocol":0,"schemaHash":"0x..."}.
+/// `schemaHash` is the build's component schema (the tool combines the modules'); "0" when unknown.
+[[nodiscard]] std::string GetVersionJson(uint64_t schemaHash = 0);
 
 /// Compile-time engine name for static assertions and compatibility checks.
 inline constexpr std::string_view kEngineName = "OyiEngine";

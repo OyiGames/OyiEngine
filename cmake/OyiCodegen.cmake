@@ -124,6 +124,15 @@ if(APPLE)
     list(APPEND OYI_CODEGEN_CLANG_ARGS "-isysroot" "${_oyi_sysroot}")
 endif()
 
+# `oyi schema validate` forwards these arguments at run time: one per line, written once here.
+set(OYI_CODEGEN_ARGS_FILE "${CMAKE_BINARY_DIR}/oyi_codegen_args.txt")
+set(_oyi_codegen_args_text "")
+foreach(_arg IN LISTS OYI_CODEGEN_CLANG_ARGS)
+    string(APPEND _oyi_codegen_args_text "${_arg}\n")
+endforeach()
+string(APPEND _oyi_codegen_args_text "-I${PROJECT_SOURCE_DIR}/engine/oyi_core/include\n")
+file(WRITE "${OYI_CODEGEN_ARGS_FILE}" "${_oyi_codegen_args_text}")
+
 # oyi_target_codegen(<target> INCLUDE_ROOT <dir> HEADERS <include-relative header>...)
 # Called by oyi_add_module; HEADERS are paths such as oyi_transform/Components.h.
 function(oyi_target_codegen target)

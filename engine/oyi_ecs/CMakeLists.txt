@@ -19,6 +19,7 @@ oyi_add_module(ecs
         include/oyi_ecs/Snapshot.h
         include/oyi_ecs/System.h
         include/oyi_ecs/World.h
+        include/oyi_ecs/WorldFile.h
     SOURCES
         src/oyi_ecs/AccessLog.cpp
         src/oyi_ecs/Archetype.cpp

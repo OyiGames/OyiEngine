@@ -32,6 +32,11 @@ TEST_CASE("generated component info matches the compiled layout", "[codegen]") {
     REQUIRE(kPositionInfo.mFields[1].mQuantize == 0.01f);
 }
 
+TEST_CASE("the header carries one schema hash over all its records", "[codegen]") {
+    STATIC_REQUIRE(kSchemaHash != 0);
+    STATIC_REQUIRE(kSchemaHash != kPositionInfo.mLayoutHash);
+}
+
 TEST_CASE("component and field flags come from the annotations", "[codegen]") {
     REQUIRE(HasFlag(kPositionInfo.mFlags, ComponentFlags::Replicated));
     REQUIRE(HasFlag(kPositionInfo.mFields[0].mFlags, FieldFlags::Replicated));

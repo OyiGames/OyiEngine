@@ -1,6 +1,7 @@
 {
   "generator": "oyi_codegen 0.1.0",
   "header": "Basic.h",
+  "schemaHash": "0x0908fd8ddab9884c",
   "records": [
     {
       "name": "oyi::golden::Extent",
