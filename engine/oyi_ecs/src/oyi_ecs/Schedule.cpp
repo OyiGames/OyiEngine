@@ -7,6 +7,7 @@
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/Schedule.h>
+#include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/System.h>
 #include <oyi_ecs/World.h>
 #include <oyi_job/CompletionDeferral.h>
@@ -285,7 +286,16 @@ core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
     // the sync point stamps its own writes.
     mWorld.AdvanceVersion(versionsUsed);
     mLastReplay = mWorld.SyncPoint(std::span<CommandBuffer* const>{mPhaseBuffers});
+    if (mSnapshot != nullptr && phase == mSnapshotPhase) {
+        mSnapshot->Capture(mWorld, mSnapshotTypes);
+    }
     return {};
+}
+
+void Schedule::SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept {
+    mSnapshot      = snapshot;
+    mSnapshotTypes = types;
+    mSnapshotPhase = phase;
 }
 
 core::Result Schedule::RunPhaseSerial(Phase phase) noexcept {

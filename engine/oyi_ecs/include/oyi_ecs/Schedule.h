@@ -4,6 +4,7 @@
 #include <oyi_core/Expected.h>
 #include <oyi_core/MemoryResource.h>
 #include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/System.h>
 #include <oyi_ecs/World.h>
 #include <oyi_job/Job.h>
@@ -70,6 +71,10 @@ public:
 
     [[nodiscard]] World::ReplayStats GetLastReplayStats() const noexcept { return mLastReplay; }
 
+    /// Captures `types` into `snapshot` right after the sync point of `phase`, every time that
+    /// phase runs (ADR-0006: the Prev snapshot the managed layer reads). nullptr disables it.
+    void SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept;
+
 private:
     struct SystemRecord;
 
@@ -88,6 +93,9 @@ private:
     bool mBuilt = false;
     Conflict mLastConflict;
     World::ReplayStats mLastReplay;
+    Snapshot* mSnapshot = nullptr;
+    ComponentMask mSnapshotTypes;
+    Phase mSnapshotPhase = Phase::End;
 };
 
 } // namespace oyi::ecs
