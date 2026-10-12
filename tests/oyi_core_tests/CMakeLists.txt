@@ -6,6 +6,7 @@ oyi_add_test(oyi_core_tests
         LinearAllocatorTests.cpp
         MemoryResourceTests.cpp
         MemoryTests.cpp
+        SpinLockTests.cpp
         SystemAllocatorTests.cpp
         TaggedHeapTests.cpp
         TypeIdTests.cpp

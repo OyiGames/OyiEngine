@@ -11,6 +11,7 @@ oyi_add_module(core
         include/oyi_core/Memory.h
         include/oyi_core/MemoryResource.h
         include/oyi_core/Schema.h
+        include/oyi_core/SpinLock.h
         include/oyi_core/SystemAllocator.h
         include/oyi_core/TaggedHeap.h
         include/oyi_core/TypeId.h
