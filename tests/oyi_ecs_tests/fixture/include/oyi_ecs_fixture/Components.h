@@ -56,4 +56,9 @@ struct OYI_STRUCT() Ping {
     uint32_t mSerial = 0;
 };
 
+/// "Move me by this much": a system turns it into velocity.
+struct OYI_STRUCT() Nudge {
+    float mX = 0.0f;
+};
+
 } // namespace oyi::ecs_fixture

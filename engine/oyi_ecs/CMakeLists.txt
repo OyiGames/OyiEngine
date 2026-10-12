@@ -8,6 +8,8 @@ oyi_add_module(ecs
         include/oyi_ecs/ComponentRegistry.h
         include/oyi_ecs/Entity.h
         include/oyi_ecs/EntityRegistry.h
+        include/oyi_ecs/Facade.h
+        include/oyi_ecs/Firewall.h
         include/oyi_ecs/Managed.h
         include/oyi_ecs/Message.h
         include/oyi_ecs/Query.h

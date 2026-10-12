@@ -3,7 +3,10 @@
 #include <oyi_core/Allocator.h>
 #include <oyi_core/Expected.h>
 #include <oyi_core/MemoryResource.h>
+#include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/Firewall.h>
+#include <oyi_ecs/Message.h>
 #include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/System.h>
 #include <oyi_ecs/World.h>
@@ -70,18 +73,35 @@ public:
     [[nodiscard]] core::Result RunFrameSerial() noexcept;
 
     [[nodiscard]] World::ReplayStats GetLastReplayStats() const noexcept { return mLastReplay; }
+    /// Commands replayed when the last firewall window closed.
+    [[nodiscard]] World::ReplayStats GetLastWindowReplayStats() const noexcept { return mLastWindowReplay; }
 
     /// Captures `types` into `snapshot` right after the sync point of `phase`, every time that
     /// phase runs (ADR-0006: the Prev snapshot the managed layer reads). nullptr disables it.
     void SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept;
 
+    /// Opens a firewall window (ADR-0006) after the sync point of `phase` (and after the snapshot
+    /// capture, when it is on the same phase), every time that phase runs. One window per phase;
+    /// nullptr removes it.
+    void SetWindow(Phase phase, WindowFunction function, void* data) noexcept;
+    /// Opens a window now, on the calling thread: no job may be in flight. The commands and
+    /// messages it records are applied and routed when `function` returns, before this call
+    /// returns (the window's own sync point). Fails with InvalidArgument without a function.
+    [[nodiscard]] core::Result RunWindow(WindowFunction function, void* data) noexcept;
+
 private:
+    struct Window {
+        WindowFunction mFunction = nullptr;
+        void* mData              = nullptr;
+    };
+
     struct SystemRecord;
 
     static void RunSystemJob(job::JobContext& context, void* data);
     void RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept;
     [[nodiscard]] core::Result EndPhase(Phase phase, uint32_t versionsUsed) noexcept;
     void RouteMessages(Phase phase) noexcept;
+    void RouteOutbox(MessageBuffer& outbox) noexcept;
     void RefreshQueries(Phase phase) noexcept;
 
     core::Allocator& mAllocator;
@@ -93,6 +113,10 @@ private:
     bool mBuilt = false;
     Conflict mLastConflict;
     World::ReplayStats mLastReplay;
+    World::ReplayStats mLastWindowReplay;
+    CommandBuffer mWindowCommands;
+    MessageBuffer mWindowOutbox;
+    std::array<Window, kPhaseCount> mWindows{};
     Snapshot* mSnapshot = nullptr;
     ComponentMask mSnapshotTypes;
     Phase mSnapshotPhase = Phase::End;

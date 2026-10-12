@@ -4,6 +4,7 @@
 #include <oyi_core/SystemAllocator.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
+#include <oyi_ecs/Firewall.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/Schedule.h>
@@ -72,7 +73,9 @@ Schedule::Schedule(core::Allocator& allocator, World& world) noexcept
              std::pmr::vector<SystemId>(&mResource), std::pmr::vector<SystemId>(&mResource),
              std::pmr::vector<SystemId>(&mResource), std::pmr::vector<SystemId>(&mResource),
              std::pmr::vector<SystemId>(&mResource), std::pmr::vector<SystemId>(&mResource)}
-    , mPhaseBuffers(&mResource) {}
+    , mPhaseBuffers(&mResource)
+    , mWindowCommands(allocator)
+    , mWindowOutbox(allocator) {}
 
 Schedule::~Schedule() {
     for (SystemRecord* const record : mSystems) {
@@ -242,29 +245,32 @@ void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator
     record.mInbox.Clear();
 }
 
-void Schedule::RouteMessages(Phase phase) noexcept {
-    // Senders in phase order, records in sending order, receivers in registration order: the
-    // queues come out the same whatever the workers did.
-    for (const SystemId sender : mOrder[static_cast<size_t>(phase)]) {
-        MessageBuffer& outbox = mSystems[sender.mValue]->mOutbox;
-        for (const MessageBuffer::Record& record : outbox.GetRecords()) {
-            const std::byte* const payload = outbox.GetPayload().data() + record.mPayloadOffset;
-            const ComponentMask* const targetMask =
-                record.mTarget.IsValid() ? mWorld.GetComponentMask(record.mTarget) : nullptr;
-            if (record.mTarget.IsValid() && targetMask == nullptr) {
-                continue; // the target died before the sync point
-            }
-            for (SystemRecord* const receiver : mSystems) {
-                if (!receiver->mDesc.mReceives.Test(record.mType)) {
-                    continue;
-                }
-                if (targetMask != nullptr && !receiver->mQuery.Matches(*targetMask)) {
-                    continue;
-                }
-                receiver->mInbox.Push(record.mType, record.mTarget, payload, record.mPayloadSize);
-            }
+void Schedule::RouteOutbox(MessageBuffer& outbox) noexcept {
+    // Records in sending order, receivers in registration order.
+    for (const MessageBuffer::Record& record : outbox.GetRecords()) {
+        const std::byte* const payload = outbox.GetPayload().data() + record.mPayloadOffset;
+        const ComponentMask* const targetMask =
+            record.mTarget.IsValid() ? mWorld.GetComponentMask(record.mTarget) : nullptr;
+        if (record.mTarget.IsValid() && targetMask == nullptr) {
+            continue; // the target died before the sync point
         }
-        outbox.Clear();
+        for (SystemRecord* const receiver : mSystems) {
+            if (!receiver->mDesc.mReceives.Test(record.mType)) {
+                continue;
+            }
+            if (targetMask != nullptr && !receiver->mQuery.Matches(*targetMask)) {
+                continue;
+            }
+            receiver->mInbox.Push(record.mType, record.mTarget, payload, record.mPayloadSize);
+        }
+    }
+    outbox.Clear();
+}
+
+void Schedule::RouteMessages(Phase phase) noexcept {
+    // Senders in phase order: the queues come out the same whatever the workers did.
+    for (const SystemId sender : mOrder[static_cast<size_t>(phase)]) {
+        RouteOutbox(mSystems[sender.mValue]->mOutbox);
     }
 }
 
@@ -289,6 +295,29 @@ core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
     if (mSnapshot != nullptr && phase == mSnapshotPhase) {
         mSnapshot->Capture(mWorld, mSnapshotTypes);
     }
+    const Window& window = mWindows[static_cast<size_t>(phase)];
+    if (window.mFunction != nullptr) {
+        return RunWindow(window.mFunction, window.mData);
+    }
+    return {};
+}
+
+void Schedule::SetWindow(Phase phase, WindowFunction function, void* data) noexcept {
+    mWindows[static_cast<size_t>(phase)] = Window{.mFunction = function, .mData = data};
+}
+
+core::Result Schedule::RunWindow(WindowFunction function, void* data) noexcept {
+    if (function == nullptr) {
+        return core::Fail(core::ErrorCode::InvalidArgument, "Schedule: a window needs a function");
+    }
+    {
+        FirewallWindow window(mWorld, mSnapshot, mWindowCommands, mWindowOutbox, data);
+        function(window);
+    }
+    // The window's own sync point: what it recorded is live before anything else runs.
+    RouteOutbox(mWindowOutbox);
+    std::array<CommandBuffer*, 1> buffers{&mWindowCommands};
+    mLastWindowReplay = mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
     return {};
 }
 
