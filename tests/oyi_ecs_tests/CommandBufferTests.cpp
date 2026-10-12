@@ -194,7 +194,7 @@ TEST_CASE("commands recorded by parallel jobs replay to the same result every ti
         uint32_t mJob = 0;
 
         static void Run(oyi::job::JobContext& /*context*/, void* data) {
-            auto* const self = static_cast<Recorder*>(data);
+            const auto* const self = static_cast<const Recorder*>(data);
             self->mBuffer->SetSortKey(self->mJob);
             for (uint32_t i = 0; i < self->mEntities->size(); ++i) {
                 // Every job writes every entity; only the highest sort key may win.
