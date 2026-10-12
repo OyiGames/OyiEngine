@@ -9,6 +9,7 @@ oyi_add_test(oyi_ecs_tests
         MessageTests.cpp
         QueryTests.cpp
         ScheduleTests.cpp
+        SnapshotTests.cpp
         WorldTests.cpp
     DEPS oyi::ecs oyi::ecs_fixture oyi::job oyi::core
 )

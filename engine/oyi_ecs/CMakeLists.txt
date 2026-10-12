@@ -11,6 +11,7 @@ oyi_add_module(ecs
         include/oyi_ecs/Message.h
         include/oyi_ecs/Query.h
         include/oyi_ecs/Schedule.h
+        include/oyi_ecs/Snapshot.h
         include/oyi_ecs/System.h
         include/oyi_ecs/World.h
     SOURCES
@@ -22,6 +23,7 @@ oyi_add_module(ecs
         src/oyi_ecs/Message.cpp
         src/oyi_ecs/Query.cpp
         src/oyi_ecs/Schedule.cpp
+        src/oyi_ecs/Snapshot.cpp
         src/oyi_ecs/World.cpp
     DEPS oyi::core oyi::job
 )
