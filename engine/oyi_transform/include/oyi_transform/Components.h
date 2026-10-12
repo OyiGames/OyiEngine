@@ -3,6 +3,8 @@
 #include <oyi_core/Annotations.h>
 #include <oyi_ecs/Entity.h>
 
+#include <cstdint>
+
 namespace oyi::transform {
 
 /// Plain xyz; the simulation-side vector type until the math library lands (ADR-0018).
@@ -55,5 +57,21 @@ struct OYI_COMPONENT() PreviousParent {
 
 /// Opt-out tag: the built-in transform systems leave this entity's matrices alone.
 struct OYI_COMPONENT(Tag) ManualTransform {};
+
+/// What the renderer reads (ADR-0010): LocalToWorld blended between the previous fixed tick
+/// (mPrevious, sampled by the presentation systems) and the current one by the frame's
+/// interpolation alpha. Presentation worlds only.
+struct OYI_COMPONENT() RenderTransform {
+    float mM[12]        = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    float mPrevious[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+};
+
+/// Per-chunk aggregate (ADR-0005): the bounds of the chunk's LocalToWorld translations, for
+/// culling and interest management.
+struct OYI_COMPONENT(Chunk) WorldBounds {
+    Float3 mMin{};
+    Float3 mMax{};
+    uint32_t mCount = 0;
+};
 
 } // namespace oyi::transform

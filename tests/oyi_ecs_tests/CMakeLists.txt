@@ -6,6 +6,7 @@ oyi_add_test(oyi_ecs_tests
         ChunkLayoutTests.cpp
         ChunkParallelTests.cpp
         CommandBufferTests.cpp
+        DownclockTests.cpp
         ComponentMaskTests.cpp
         EntityRegistryTests.cpp
         FirewallTests.cpp

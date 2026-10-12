@@ -108,6 +108,9 @@ struct Schedule::SystemRecord {
     uint32_t mTaskCount   = 0;       ///< chunk tasks of the run in progress
     job::JobSystem* mJobs = nullptr; ///< the job system of the run in progress; nullptr when serial
     WorldKindMask mKinds  = kAllWorldKinds;
+    uint32_t mRateDivisor = 1;
+    uint32_t mFrames      = 0;     ///< runs offered so far, for the divisor
+    bool mRanThisPhase    = false; ///< false when the divisor skipped it
     std::pmr::vector<SystemId> mPredecessors;
     uint32_t mOrderIndex  = 0; ///< position within the phase after Build
     uint32_t mLastVersion = 0;
@@ -157,6 +160,24 @@ core::Expected<SystemId> Schedule::AddSystem(const SystemDesc& desc, WorldKindMa
     record->mKinds = kinds;
     mSystems.push_back(record);
     return SystemId{.mValue = static_cast<uint32_t>(mSystems.size() - 1)};
+}
+
+core::Result Schedule::SetRateDivisor(SystemId system, uint32_t divisor) noexcept {
+    if (system.mValue >= mSystems.size() || divisor == 0) {
+        return core::Fail(core::ErrorCode::InvalidArgument, "Schedule: a registered system and a divisor above zero");
+    }
+    SystemRecord& record = *mSystems[system.mValue];
+    if (record.mDesc.mPhase < Phase::Presentation) {
+        return core::Fail(core::ErrorCode::InvalidArgument,
+                          "Schedule: only Presentation and End systems may be downclocked");
+    }
+    record.mRateDivisor = divisor;
+    return {};
+}
+
+uint32_t Schedule::GetRateDivisor(SystemId system) const noexcept {
+    OYI_ASSERT(system.mValue < mSystems.size(), "Schedule: unknown system");
+    return mSystems[system.mValue]->mRateDivisor;
 }
 
 bool Schedule::IsSystemIncluded(SystemId system) const noexcept {
@@ -358,8 +379,14 @@ void Schedule::RefreshQueries(Phase phase) noexcept {
 }
 
 void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept {
-    record.mRunVersion = version;
-    record.mTaskCount  = 0;
+    record.mRunVersion   = version;
+    record.mTaskCount    = 0;
+    record.mRanThisPhase = record.mRateDivisor <= 1 || (record.mFrames % record.mRateDivisor) == 0;
+    ++record.mFrames;
+    if (!record.mRanThisPhase) {
+        record.mAccesses.Clear();
+        return; // downclocked: this frame is not its turn
+    }
     SystemContext context(mWorld, record.mQuery, record.mCommands, record.mOutbox, record.mInbox, record.mDesc, version,
                           record.mLastVersion, scratch,
                           ChunkTaskDispatcher{.mFunction = &Schedule::DispatchChunkTasks, .mOwner = &record});
@@ -508,9 +535,11 @@ core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
             record.mTaskCommands[i].SetSortKey(record.mOrderIndex);
             mPhaseBuffers.push_back(&record.mTaskCommands[i]);
         }
-        record.mLastVersion = record.mRunVersion;
-        // Delivered messages are for one run only.
-        record.mInbox.Clear();
+        if (record.mRanThisPhase) {
+            record.mLastVersion = record.mRunVersion;
+            // Delivered messages are for one run only; a skipped run keeps them for the next.
+            record.mInbox.Clear();
+        }
     }
     // Every system of the phase used its own version; move the world past all of them before
     // the sync point stamps its own writes.

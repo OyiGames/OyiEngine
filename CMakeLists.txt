@@ -10,6 +10,10 @@ project(OyiEngine
 # They live in CMakePresets.json and cmake/toolchains/*.cmake (ADR-0002).
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# No C++ modules anywhere: the scanner CMake runs for C++20 targets only costs time and, with
+# Ninja and MSVC, has left objects stale after header changes.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 include(CTest)
 include(GNUInstallDirs)
 include(OyiBuildSettings)

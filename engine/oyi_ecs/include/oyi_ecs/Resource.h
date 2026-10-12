@@ -95,12 +95,13 @@ private:
 /// time model of ADR-0014. The main loop writes it between phases; systems that write it inside a
 /// phase are ordered automatically.
 struct Environment {
-    uint64_t mFrameIndex               = 0; ///< frames the owner has run
-    uint64_t mSimulationTick           = 0; ///< integer fixed-step ticks; server-authoritative, never scaled
-    float mFixedStepSeconds            = 1.0f / 30.0f;
-    double mPresentationSeconds        = 0.0;  ///< variable-rate clock for interpolation, animation, effects
-    float mDeltaSeconds                = 0.0f; ///< presentation time elapsed since the previous frame
-    int64_t mPersistentUtcMilliseconds = 0;    ///< wall clock for lazy settlement of offline progress
+    uint64_t mFrameIndex        = 0; ///< frames the owner has run
+    uint64_t mSimulationTick    = 0; ///< integer fixed-step ticks; server-authoritative, never scaled
+    float mFixedStepSeconds     = 1.0f / 30.0f;
+    double mPresentationSeconds = 0.0;  ///< variable-rate clock for interpolation, animation, effects
+    float mDeltaSeconds         = 0.0f; ///< presentation time elapsed since the previous frame
+    float mInterpolationAlpha   = 0.0f; ///< fraction of the next fixed step already elapsed (FixedStepper::GetAlpha)
+    int64_t mPersistentUtcMilliseconds = 0; ///< wall clock for lazy settlement of offline progress
 };
 
 inline constexpr std::string_view kEnvironmentResourceName = "oyi::ecs::Environment";
