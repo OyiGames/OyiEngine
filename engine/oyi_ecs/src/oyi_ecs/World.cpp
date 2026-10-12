@@ -1,6 +1,8 @@
 #include <oyi_core/Allocator.h>
 #include <oyi_core/Assert.h>
 #include <oyi_core/Expected.h>
+#include <oyi_core/TypeId.h>
+#include <oyi_ecs/AccessLog.h>
 #include <oyi_ecs/Archetype.h>
 #include <oyi_ecs/ChunkLayout.h>
 #include <oyi_ecs/CommandBuffer.h>
@@ -181,6 +183,7 @@ const void* World::GetComponent(EntityId entity, ComponentTypeIndex type) const 
     if (column == nullptr) {
         return nullptr;
     }
+    RecordAccess(archetype, row.mChunk, type, AccessKind::Read);
     return archetype.GetColumn(row.mChunk, *column) + (static_cast<size_t>(row.mIndex) * column->mElementSize);
 }
 
@@ -194,6 +197,7 @@ void* World::GetComponentForWrite(EntityId entity, ComponentTypeIndex type, uint
     if (column == nullptr) {
         return nullptr;
     }
+    RecordAccess(archetype, row.mChunk, type, AccessKind::Write);
     archetype.SetVersion(row.mChunk, column->mSlot, version);
     return archetype.GetColumn(row.mChunk, *column) + (static_cast<size_t>(row.mIndex) * column->mElementSize);
 }
@@ -334,6 +338,41 @@ World::ReplayStats World::SyncPoint(std::span<CommandBuffer* const> buffers) noe
     const ReplayStats stats = ReplayCommands(buffers);
     AdvanceVersion();
     return stats;
+}
+
+namespace {
+
+[[nodiscard]] uint64_t HashBytes(uint64_t hash, const std::byte* data, size_t size) noexcept {
+    for (size_t i = 0; i < size; ++i) {
+        hash ^= static_cast<uint64_t>(static_cast<uint8_t>(data[i]));
+        hash *= 0x0000'0100'0000'01B3ull;
+    }
+    return hash;
+}
+
+} // namespace
+
+uint64_t World::ComputeStateHash() const noexcept {
+    uint64_t hash = core::Fnv1a64("oyi::ecs::World");
+    for (const Archetype* const archetype : mArchetypes) {
+        const ChunkLayout& layout = archetype->GetLayout();
+        for (uint32_t chunk = 0; chunk < archetype->GetChunkCount(); ++chunk) {
+            const uint32_t count                     = archetype->GetChunk(chunk).mCount;
+            const std::span<const EntityId> entities = archetype->GetEntities(chunk);
+            hash                                     = HashBytes(hash,
+                                                                 reinterpret_cast<const std::byte*>(
+                                 entities.data()), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                                                                 entities.size() * sizeof(EntityId));
+            for (const ColumnLayout& column : layout.GetColumns()) {
+                hash = HashBytes(hash, archetype->GetColumn(chunk, column),
+                                 static_cast<size_t>(count) * column.mElementSize);
+            }
+            for (const ChunkComponentLayout& component : layout.GetChunkComponents()) {
+                hash = HashBytes(hash, archetype->GetChunkComponent(chunk, component), component.mSize);
+            }
+        }
+    }
+    return hash;
 }
 
 World::Stats World::GetStats() const noexcept {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <oyi_ecs/AccessLog.h>
 #include <oyi_ecs/Archetype.h>
 #include <oyi_ecs/ChunkLayout.h>
 #include <oyi_ecs/ComponentMask.h>
@@ -28,7 +29,11 @@ public:
     /// Element 0 of the column, or nullptr when the archetype lacks the type or it is a tag.
     [[nodiscard]] const void* GetColumn(ComponentTypeIndex type) const noexcept {
         const ColumnLayout* const column = mArchetype.GetLayout().FindColumn(type);
-        return column == nullptr ? nullptr : mArchetype.GetColumn(mChunk, *column);
+        if (column == nullptr) {
+            return nullptr;
+        }
+        RecordAccess(mArchetype, mChunk, type, AccessKind::Read);
+        return mArchetype.GetColumn(mChunk, *column);
     }
 
     /// Same as GetColumn and marks the type as changed in this chunk.
@@ -37,6 +42,7 @@ public:
         if (column == nullptr) {
             return nullptr;
         }
+        RecordAccess(mArchetype, mChunk, type, AccessKind::Write);
         mArchetype.SetVersion(mChunk, column->mSlot, mVersion);
         return mArchetype.GetColumn(mChunk, *column);
     }
@@ -72,7 +78,11 @@ public:
 
     [[nodiscard]] const void* GetChunkComponent(ComponentTypeIndex type) const noexcept {
         const ChunkComponentLayout* const component = mArchetype.GetLayout().FindChunkComponent(type);
-        return component == nullptr ? nullptr : mArchetype.GetChunkComponent(mChunk, *component);
+        if (component == nullptr) {
+            return nullptr;
+        }
+        RecordAccess(mArchetype, mChunk, type, AccessKind::Read);
+        return mArchetype.GetChunkComponent(mChunk, *component);
     }
 
     [[nodiscard]] void* GetChunkComponentForWrite(ComponentTypeIndex type) noexcept {
@@ -80,6 +90,7 @@ public:
         if (component == nullptr) {
             return nullptr;
         }
+        RecordAccess(mArchetype, mChunk, type, AccessKind::Write);
         mArchetype.SetVersion(mChunk, component->mSlot, mVersion);
         return mArchetype.GetChunkComponent(mChunk, *component);
     }

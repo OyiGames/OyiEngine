@@ -68,6 +68,17 @@ class SystemContext;
 /// Systems are stateless functions (ADR-0007); state lives in components, resources or `mData`.
 using SystemFunction = void (*)(SystemContext& context);
 
+/// One chunk of a system's query as a task of its own (SystemContext::ParallelForEachChunk).
+/// `task` is that task's context: its own command buffer, outbox and scratch memory.
+using ChunkTaskFunction = void (*)(SystemContext& task, ChunkView& view);
+
+/// How SystemContext::ParallelForEachChunk reaches the schedule; empty for a context that stands
+/// alone (the chunks then run inline).
+struct ChunkTaskDispatcher {
+    core::Result (*mFunction)(void* owner, SystemContext& outer, ChunkTaskFunction function) = nullptr;
+    void* mOwner                                                                             = nullptr;
+};
+
 /// Declares a system: what it reads and writes is its permission set (ADR-0007: the parameter
 /// type is the permission). The schedule derives the query (`mRead` and `mWrite` must all be
 /// present, `mExclude` must not) and the conflict pairs from these masks.
@@ -107,7 +118,9 @@ struct ReceivedMessages {
 class SystemContext {
 public:
     SystemContext(World& world, Query& query, CommandBuffer& commands, MessageBuffer& outbox, const MessageInbox& inbox,
-                  const SystemDesc& desc, uint32_t version, uint32_t lastVersion, core::Allocator& scratch) noexcept
+                  const SystemDesc& desc, uint32_t version, uint32_t lastVersion, core::Allocator& scratch,
+                  ChunkTaskDispatcher dispatcher = {}, const Archetype* ownedArchetype = nullptr,
+                  uint32_t ownedChunk = 0) noexcept
         : mWorld(world)
         , mQuery(query)
         , mCommands(commands)
@@ -116,7 +129,10 @@ public:
         , mDesc(desc)
         , mVersion(version)
         , mLastVersion(lastVersion)
-        , mScratch(scratch) {}
+        , mScratch(scratch)
+        , mDispatcher(dispatcher)
+        , mOwnedArchetype(ownedArchetype)
+        , mOwnedChunk(ownedChunk) {}
 
     [[nodiscard]] const World& GetWorld() const noexcept { return mWorld; }
     [[nodiscard]] CommandBuffer& GetCommands() noexcept { return mCommands; }
@@ -193,6 +209,27 @@ public:
         mWorld.ForEachChunk(mQuery, mVersion, fn);
     }
 
+    /// Visits the chunks of the query as independent tasks (ADR-0005: chunk-level parallelism).
+    /// On the job system the tasks run side by side and splice into this system's completion; in
+    /// the serial run they run in chunk order. Each task gets a SystemContext of its own: its own
+    /// command buffer and outbox (replayed and routed in chunk order after this system's), the
+    /// worker's scratch memory, and the chunk it owns. Inside a task, Lookup may reach other
+    /// chunks for types this system does not write; writing another chunk is a violation the
+    /// access checks report (ADR-0019: Premark). Fails with OutOfMemory when the task table does
+    /// not fit the frame memory.
+    [[nodiscard]] core::Result ParallelForEachChunk(ChunkTaskFunction function) noexcept {
+        if (mDispatcher.mFunction == nullptr) {
+            ForEachChunk([&](ChunkView& view) { function(*this, view); });
+            return {};
+        }
+        return mDispatcher.mFunction(mDispatcher.mOwner, *this, function);
+    }
+
+    /// True inside a chunk task; the task owns exactly this chunk.
+    [[nodiscard]] bool IsChunkTask() const noexcept { return mOwnedArchetype != nullptr; }
+    [[nodiscard]] const Archetype* GetOwnedArchetype() const noexcept { return mOwnedArchetype; }
+    [[nodiscard]] uint32_t GetOwnedChunk() const noexcept { return mOwnedChunk; }
+
     template <typename T>
     [[nodiscard]] std::span<const T> Read(const ChunkView& view, ComponentTypeIndex type) const noexcept {
         OYI_ASSERT(CanRead(type), "system reads a component type it did not declare");
@@ -230,6 +267,9 @@ private:
     uint32_t mVersion;
     uint32_t mLastVersion;
     core::Allocator& mScratch;
+    ChunkTaskDispatcher mDispatcher;
+    const Archetype* mOwnedArchetype;
+    uint32_t mOwnedChunk;
 };
 
 } // namespace oyi::ecs

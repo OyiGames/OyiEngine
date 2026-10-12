@@ -173,8 +173,15 @@ public:
 
     [[nodiscard]] const Archetype* FindArchetype(const ComponentMask& mask) const noexcept;
     [[nodiscard]] const Archetype& GetArchetype(uint32_t index) const noexcept { return *mArchetypes[index]; }
+    /// For code that builds ChunkViews of its own (the schedule's chunk tasks).
+    [[nodiscard]] Archetype& GetArchetypeForWrite(uint32_t index) noexcept { return *mArchetypes[index]; }
     [[nodiscard]] uint32_t GetArchetypeCount() const noexcept { return static_cast<uint32_t>(mArchetypes.size()); }
     [[nodiscard]] Stats GetStats() const noexcept;
+
+    /// FNV-1a over every archetype's chunks (entity ids, columns, chunk components) in storage
+    /// order: two worlds that ran the same frames the same way hash alike (ADR-0019: the serial
+    /// vs parallel comparison). Enable bits and versions are not included.
+    [[nodiscard]] uint64_t ComputeStateHash() const noexcept;
 
 private:
     [[nodiscard]] core::Expected<Archetype*> GetOrCreateArchetype(const ComponentMask& mask) noexcept;

@@ -3,6 +3,7 @@
 #include <oyi_core/Allocator.h>
 #include <oyi_core/Expected.h>
 #include <oyi_core/MemoryResource.h>
+#include <oyi_ecs/AccessLog.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Firewall.h>
@@ -35,6 +36,29 @@ public:
     struct Conflict {
         SystemId mFirst;
         SystemId mSecond;
+    };
+
+    /// ADR-0019: what the runtime access checks do with what the systems recorded.
+    enum class AccessCheckMode : uint8_t {
+        Off,    ///< nothing is recorded
+        Record, ///< violations are collected (GetViolations) and execution goes on
+        Assert, ///< a violation terminates, as a failed OYI_CHECK does
+    };
+
+    enum class AccessViolationKind : uint8_t {
+        Undeclared, ///< a system touched a type outside its declared masks
+        Unordered,  ///< two systems without an order edge touched the same chunk and one wrote
+        CrossChunk, ///< a chunk task touched another chunk for a type its system writes (Premark)
+    };
+
+    struct AccessViolation {
+        AccessViolationKind mKind;
+        SystemId mFirst;
+        SystemId mSecond; ///< invalid for Undeclared
+        ComponentTypeIndex mType;
+        AccessKind mAccess;
+        const Archetype* mArchetype;
+        uint32_t mChunk;
     };
 
     Schedule(core::Allocator& allocator, World& world) noexcept;
@@ -77,6 +101,17 @@ public:
     /// Commands replayed when the last firewall window closed.
     [[nodiscard]] World::ReplayStats GetLastWindowReplayStats() const noexcept { return mLastWindowReplay; }
 
+    /// Runtime access checks (ADR-0019, MAW-lite): every system run records the (chunk, type)
+    /// pairs it touched; at the phase boundary each record is checked against the declared masks
+    /// and every unordered pair of systems is checked for overlapping writes. Assert in Debug
+    /// builds, Off when OYI_ACCESS_CHECKS is compiled out; the serial run checks the same way.
+    void SetAccessCheckMode(AccessCheckMode mode) noexcept { mAccessMode = mode; }
+    [[nodiscard]] AccessCheckMode GetAccessCheckMode() const noexcept { return mAccessMode; }
+    /// Violations found at the end of the last phase run.
+    [[nodiscard]] std::span<const AccessViolation> GetViolations() const noexcept { return mViolations; }
+    /// What `system` touched during its last run.
+    [[nodiscard]] const AccessLog& GetAccessLog(SystemId system) const noexcept;
+
     /// Captures `types` into `snapshot` right after the sync point of `phase`, every time that
     /// phase runs (ADR-0006: the Prev snapshot the managed layer reads). nullptr disables it.
     void SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept;
@@ -97,14 +132,21 @@ private:
     };
 
     struct SystemRecord;
+    struct TaskOwner;
+    struct ChunkTask;
 
     static void RunSystemJob(job::JobContext& context, void* data);
+    [[nodiscard]] static core::Result DispatchChunkTasks(void* owner, SystemContext& outer,
+                                                         ChunkTaskFunction function) noexcept;
+    static void RunChunkTask(SystemRecord& record, const ChunkTask& task, core::Allocator& scratch) noexcept;
+    static void RunChunkTasksJob(job::JobContext& context, void* data, uint32_t begin, uint32_t end);
     /// Derives the per-phase order from the current edges and fills `reach` (count x count).
     [[nodiscard]] core::Result Sort(std::span<uint8_t> reach) noexcept;
     void RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept;
     [[nodiscard]] core::Result EndPhase(Phase phase, uint32_t versionsUsed) noexcept;
     void RouteMessages(Phase phase) noexcept;
     void RouteOutbox(MessageBuffer& outbox) noexcept;
+    void ValidateAccesses(Phase phase) noexcept;
     void RefreshQueries(Phase phase) noexcept;
 
     core::Allocator& mAllocator;
@@ -120,7 +162,10 @@ private:
     CommandBuffer mWindowCommands;
     MessageBuffer mWindowOutbox;
     std::array<Window, kPhaseCount> mWindows{};
-    Snapshot* mSnapshot = nullptr;
+    std::pmr::vector<uint8_t> mReach; ///< count x count: a is ordered before b, kept from Build
+    std::pmr::vector<AccessViolation> mViolations;
+    AccessCheckMode mAccessMode = OYI_ACCESS_CHECKS != 0 ? AccessCheckMode::Assert : AccessCheckMode::Off;
+    Snapshot* mSnapshot         = nullptr;
     ComponentMask mSnapshotTypes;
     Phase mSnapshotPhase = Phase::End;
 };

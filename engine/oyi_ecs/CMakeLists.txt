@@ -1,5 +1,6 @@
 oyi_add_module(ecs
     PUBLIC_HEADERS
+        include/oyi_ecs/AccessLog.h
         include/oyi_ecs/Archetype.h
         include/oyi_ecs/ChunkLayout.h
         include/oyi_ecs/ChunkView.h
@@ -19,6 +20,7 @@ oyi_add_module(ecs
         include/oyi_ecs/System.h
         include/oyi_ecs/World.h
     SOURCES
+        src/oyi_ecs/AccessLog.cpp
         src/oyi_ecs/Archetype.cpp
         src/oyi_ecs/ChunkLayout.cpp
         src/oyi_ecs/CommandBuffer.cpp

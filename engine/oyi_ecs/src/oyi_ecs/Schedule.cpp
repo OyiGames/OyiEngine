@@ -1,7 +1,11 @@
 #include <oyi_core/Allocator.h>
 #include <oyi_core/Assert.h>
 #include <oyi_core/Expected.h>
+#include <oyi_core/FrameAllocator.h>
 #include <oyi_core/SystemAllocator.h>
+#include <oyi_ecs/AccessLog.h>
+#include <oyi_ecs/Archetype.h>
+#include <oyi_ecs/ChunkView.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Firewall.h>
@@ -14,12 +18,16 @@
 #include <oyi_ecs/World.h>
 #include <oyi_job/CompletionDeferral.h>
 #include <oyi_job/Job.h>
+#include <oyi_job/JobBuilder.h>
 #include <oyi_job/JobSystem.h>
+#include <oyi_job/ParallelFor.h>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <memory>
 #include <memory_resource>
 #include <span>
 #include <vector>
@@ -53,7 +61,24 @@ namespace {
 
 } // namespace
 
+/// The chunk a task owns (ADR-0019 Premark): writes elsewhere are violations.
+struct Schedule::TaskOwner {
+    const Archetype* mArchetype = nullptr;
+    uint32_t mChunk             = 0;
+};
+
+/// One chunk task of a ParallelForEachChunk; the array lives in frame memory until the jobs ran.
+struct Schedule::ChunkTask {
+    SystemRecord* mRecord;
+    Archetype* mArchetype;
+    uint32_t mChunk;
+    uint32_t mIndex; ///< which task buffers it uses
+    ChunkTaskFunction mFunction;
+};
+
 struct Schedule::SystemRecord {
+    // pmr containers report exhaustion through MemoryResource, which terminates; they never throw.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     SystemRecord(Schedule& owner, const SystemDesc& desc, core::Allocator& allocator,
                  std::pmr::memory_resource* resource) noexcept
         : mOwner(owner)
@@ -62,6 +87,11 @@ struct Schedule::SystemRecord {
         , mCommands(allocator)
         , mOutbox(allocator)
         , mInbox(allocator)
+        , mAccesses(allocator)
+        , mTaskCommands(resource)
+        , mTaskOutboxes(resource)
+        , mTaskLogs(resource)
+        , mTaskOwners(resource)
         , mPredecessors(resource) {}
 
     Schedule& mOwner;
@@ -70,6 +100,13 @@ struct Schedule::SystemRecord {
     CommandBuffer mCommands;
     MessageBuffer mOutbox;
     MessageInbox mInbox;
+    AccessLog mAccesses;
+    std::pmr::deque<CommandBuffer> mTaskCommands; ///< one set per chunk task, grown once, reused
+    std::pmr::deque<MessageBuffer> mTaskOutboxes;
+    std::pmr::deque<AccessLog> mTaskLogs;
+    std::pmr::vector<TaskOwner> mTaskOwners;
+    uint32_t mTaskCount   = 0;       ///< chunk tasks of the run in progress
+    job::JobSystem* mJobs = nullptr; ///< the job system of the run in progress; nullptr when serial
     std::pmr::vector<SystemId> mPredecessors;
     uint32_t mOrderIndex  = 0; ///< position within the phase after Build
     uint32_t mLastVersion = 0;
@@ -88,7 +125,9 @@ Schedule::Schedule(core::Allocator& allocator, World& world) noexcept
              std::pmr::vector<SystemId>(&mResource), std::pmr::vector<SystemId>(&mResource)}
     , mPhaseBuffers(&mResource)
     , mWindowCommands(allocator)
-    , mWindowOutbox(allocator) {}
+    , mWindowOutbox(allocator)
+    , mReach(&mResource)
+    , mViolations(&mResource) {}
 
 Schedule::~Schedule() {
     for (SystemRecord* const record : mSystems) {
@@ -210,8 +249,9 @@ core::Result Schedule::Build() noexcept {
     }
     const auto count = static_cast<uint32_t>(mSystems.size());
     // reach[a * count + b] != 0 when a is ordered before b through edges.
-    std::pmr::vector<uint8_t> reach(static_cast<size_t>(count) * count, uint8_t{0}, &mResource);
-    const core::Result sorted = Sort(reach);
+    mReach.assign(static_cast<size_t>(count) * count, uint8_t{0});
+    const std::span<uint8_t> reach = mReach;
+    const core::Result sorted      = Sort(reach);
     if (!sorted.has_value()) {
         return sorted;
     }
@@ -302,12 +342,102 @@ void Schedule::RefreshQueries(Phase phase) noexcept {
 }
 
 void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept {
+    record.mRunVersion = version;
+    record.mTaskCount  = 0;
     SystemContext context(mWorld, record.mQuery, record.mCommands, record.mOutbox, record.mInbox, record.mDesc, version,
-                          record.mLastVersion, scratch);
+                          record.mLastVersion, scratch,
+                          ChunkTaskDispatcher{.mFunction = &Schedule::DispatchChunkTasks, .mOwner = &record});
+    record.mAccesses.Clear();
+    const AccessScope recording(mAccessMode != AccessCheckMode::Off ? &record.mAccesses : nullptr);
     record.mDesc.mFunction(context);
-    record.mLastVersion = version;
-    // Delivered messages are for one run only.
-    record.mInbox.Clear();
+    // mLastVersion and the inbox are settled at the end of the phase: chunk tasks may still run.
+}
+
+void Schedule::RunChunkTask(SystemRecord& record, const ChunkTask& task, core::Allocator& scratch) noexcept {
+    SystemContext context(record.mOwner.mWorld, record.mQuery, record.mTaskCommands[task.mIndex],
+                          record.mTaskOutboxes[task.mIndex], record.mInbox, record.mDesc, record.mRunVersion,
+                          record.mLastVersion, scratch, ChunkTaskDispatcher{}, task.mArchetype, task.mChunk);
+    const AccessScope recording(record.mOwner.mAccessMode != AccessCheckMode::Off ? &record.mTaskLogs[task.mIndex]
+                                                                                  : nullptr);
+    ChunkView view(*task.mArchetype, task.mChunk, record.mRunVersion);
+    task.mFunction(context, view);
+}
+
+void Schedule::RunChunkTasksJob(job::JobContext& context, void* data, uint32_t begin, uint32_t end) {
+    const auto* const tasks = static_cast<const ChunkTask*>(data);
+    for (uint32_t i = begin; i < end; ++i) {
+        RunChunkTask(*tasks[i].mRecord, tasks[i], context.mFrameAllocator);
+    }
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+core::Result Schedule::DispatchChunkTasks(void* owner, SystemContext& outer, ChunkTaskFunction function) noexcept {
+    auto* const record = static_cast<SystemRecord*>(owner);
+    Schedule& self     = record->mOwner;
+    World& world       = self.mWorld;
+    // The query cache was refreshed on the main thread before the phase; this only reads it.
+    uint32_t count = 0;
+    for (const uint32_t index : record->mQuery.GetMatches(world)) {
+        count += world.GetArchetype(index).GetChunkCount();
+    }
+    while (record->mTaskCommands.size() < count) {
+        record->mTaskCommands.emplace_back(self.mAllocator);
+        record->mTaskOutboxes.emplace_back(self.mAllocator);
+        record->mTaskLogs.emplace_back(self.mAllocator);
+    }
+    record->mTaskOwners.resize(count);
+    record->mTaskCount = count;
+    for (uint32_t i = 0; i < count; ++i) {
+        record->mTaskCommands[i].Clear();
+        record->mTaskOutboxes[i].Clear();
+        record->mTaskLogs[i].Clear();
+    }
+    if (count == 0) {
+        return {};
+    }
+    if (record->mJobs == nullptr) {
+        // The serial run: the same tasks, the same buffers, one after another in chunk order.
+        uint32_t next = 0;
+        for (const uint32_t index : record->mQuery.GetMatches(world)) {
+            Archetype& archetype = world.GetArchetypeForWrite(index);
+            for (uint32_t chunk = 0; chunk < archetype.GetChunkCount(); ++chunk) {
+                record->mTaskOwners[next] = TaskOwner{.mArchetype = &archetype, .mChunk = chunk};
+                const ChunkTask task{.mRecord    = record,
+                                     .mArchetype = &archetype,
+                                     .mChunk     = chunk,
+                                     .mIndex     = next,
+                                     .mFunction  = function};
+                RunChunkTask(*record, task, outer.GetScratch());
+                ++next;
+            }
+        }
+        return {};
+    }
+    // The task table lives in this worker's frame memory until the frame ends.
+    core::FrameAllocator& frame = record->mJobs->GetCurrentFrameAllocator();
+    void* const memory          = frame.Allocate(sizeof(ChunkTask) * count, alignof(ChunkTask));
+    if (memory == nullptr) {
+        return core::Fail(core::ErrorCode::OutOfMemory, "Schedule: no frame memory for the chunk tasks");
+    }
+    auto* const tasks = static_cast<ChunkTask*>(memory);
+    uint32_t next     = 0;
+    for (const uint32_t index : record->mQuery.GetMatches(world)) {
+        Archetype& archetype = world.GetArchetypeForWrite(index);
+        for (uint32_t chunk = 0; chunk < archetype.GetChunkCount(); ++chunk) {
+            record->mTaskOwners[next] = TaskOwner{.mArchetype = &archetype, .mChunk = chunk};
+            std::construct_at(&tasks[next], ChunkTask{.mRecord    = record,
+                                                      .mArchetype = &archetype,
+                                                      .mChunk     = chunk,
+                                                      .mIndex     = next,
+                                                      .mFunction  = function});
+            ++next;
+        }
+    }
+    // The tasks splice into this system's completion counter, so everything that waits for the
+    // system also waits for its chunks (ADR-0009: nested builders accumulate into the parent).
+    job::JobBuilder builder(*record->mJobs, record->mDesc.mName, job::JobPriority::Critical, job::CounterId::Invalid(),
+                            record->mDone, job::JobBuilder::Fence::None);
+    return job::ParallelFor(builder, record->mDesc.mName, count, 1, &Schedule::RunChunkTasksJob, tasks, nullptr);
 }
 
 void Schedule::RouteOutbox(MessageBuffer& outbox) noexcept {
@@ -333,9 +463,14 @@ void Schedule::RouteOutbox(MessageBuffer& outbox) noexcept {
 }
 
 void Schedule::RouteMessages(Phase phase) noexcept {
-    // Senders in phase order: the queues come out the same whatever the workers did.
+    // Senders in phase order, a system's chunk tasks in chunk order after it: the queues come
+    // out the same whatever the workers did.
     for (const SystemId sender : mOrder[static_cast<size_t>(phase)]) {
-        RouteOutbox(mSystems[sender.mValue]->mOutbox);
+        SystemRecord& record = *mSystems[sender.mValue];
+        RouteOutbox(record.mOutbox);
+        for (uint32_t i = 0; i < record.mTaskCount; ++i) {
+            RouteOutbox(record.mTaskOutboxes[i]);
+        }
     }
 }
 
@@ -346,12 +481,20 @@ void Schedule::RunSystemJob(job::JobContext& context, void* data) {
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
 core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
+    ValidateAccesses(phase);
     RouteMessages(phase);
     mPhaseBuffers.clear();
     for (const SystemId system : mOrder[static_cast<size_t>(phase)]) {
         SystemRecord& record = *mSystems[system.mValue];
         record.mCommands.SetSortKey(record.mOrderIndex);
         mPhaseBuffers.push_back(&record.mCommands);
+        for (uint32_t i = 0; i < record.mTaskCount; ++i) {
+            record.mTaskCommands[i].SetSortKey(record.mOrderIndex);
+            mPhaseBuffers.push_back(&record.mTaskCommands[i]);
+        }
+        record.mLastVersion = record.mRunVersion;
+        // Delivered messages are for one run only.
+        record.mInbox.Clear();
     }
     // Every system of the phase used its own version; move the world past all of them before
     // the sync point stamps its own writes.
@@ -386,6 +529,88 @@ core::Result Schedule::RunWindow(WindowFunction function, void* data) noexcept {
     return {};
 }
 
+const AccessLog& Schedule::GetAccessLog(SystemId system) const noexcept {
+    OYI_ASSERT(system.mValue < mSystems.size(), "Schedule: unknown system");
+    return mSystems[system.mValue]->mAccesses;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+void Schedule::ValidateAccesses(Phase phase) noexcept {
+    mViolations.clear();
+    if (mAccessMode == AccessCheckMode::Off) {
+        return;
+    }
+    const std::span<const SystemId> order = mOrder[static_cast<size_t>(phase)];
+    const size_t count                    = mSystems.size();
+    // Chunk tasks: each table folds into the system's, and a write outside the task's own chunk
+    // (for a type the system writes, a read of another chunk races with its owner) is reported.
+    for (const SystemId system : order) {
+        SystemRecord& record = *mSystems[system.mValue];
+        for (uint32_t i = 0; i < record.mTaskCount; ++i) {
+            const TaskOwner owner = record.mTaskOwners[i];
+            for (const AccessEntry& entry : record.mTaskLogs[i].GetEntries()) {
+                record.mAccesses.Record(*entry.mArchetype, entry.mChunk, entry.mType, entry.mKind);
+                const bool own = entry.mArchetype == owner.mArchetype && entry.mChunk == owner.mChunk;
+                if (!own && record.mDesc.mWrite.Test(entry.mType)) {
+                    mViolations.push_back(AccessViolation{.mKind      = AccessViolationKind::CrossChunk,
+                                                          .mFirst     = system,
+                                                          .mSecond    = SystemId::Invalid(),
+                                                          .mType      = entry.mType,
+                                                          .mAccess    = entry.mKind,
+                                                          .mArchetype = entry.mArchetype,
+                                                          .mChunk     = entry.mChunk});
+                }
+            }
+        }
+    }
+    // Every access against the declaration that the static half of the check relied on.
+    for (const SystemId system : order) {
+        const SystemRecord& record = *mSystems[system.mValue];
+        for (const AccessEntry& entry : record.mAccesses.GetEntries()) {
+            const bool declared = entry.mKind == AccessKind::Write
+                                      ? record.mDesc.mWrite.Test(entry.mType)
+                                      : record.mDesc.mRead.Test(entry.mType) || record.mDesc.mWrite.Test(entry.mType);
+            if (!declared) {
+                mViolations.push_back(AccessViolation{.mKind      = AccessViolationKind::Undeclared,
+                                                      .mFirst     = system,
+                                                      .mSecond    = SystemId::Invalid(),
+                                                      .mType      = entry.mType,
+                                                      .mAccess    = entry.mKind,
+                                                      .mArchetype = entry.mArchetype,
+                                                      .mChunk     = entry.mChunk});
+            }
+        }
+    }
+    // Every pair the graph did not order: they may have run side by side, so their tables must
+    // not overlap on a write (ADR-0019: compared at the join, timing ignored).
+    for (size_t i = 0; i < order.size(); ++i) {
+        for (size_t j = i + 1; j < order.size(); ++j) {
+            const uint32_t a = order[i].mValue;
+            const uint32_t b = order[j].mValue;
+            if (mReach[(static_cast<size_t>(a) * count) + b] != 0 ||
+                mReach[(static_cast<size_t>(b) * count) + a] != 0) {
+                continue;
+            }
+            const AccessEntry* const entry = mSystems[a]->mAccesses.FindConflict(mSystems[b]->mAccesses);
+            if (entry == nullptr) {
+                continue;
+            }
+            mViolations.push_back(AccessViolation{.mKind      = AccessViolationKind::Unordered,
+                                                  .mFirst     = order[i],
+                                                  .mSecond    = order[j],
+                                                  .mType      = entry->mType,
+                                                  .mAccess    = entry->mKind,
+                                                  .mArchetype = entry->mArchetype,
+                                                  .mChunk     = entry->mChunk});
+        }
+    }
+    if (mAccessMode == AccessCheckMode::Assert && !mViolations.empty()) {
+        core::ReportAssertionFailure("Schedule access checks",
+                                     "a system touched a chunk outside its declaration or beside an unordered "
+                                     "system; see Schedule::GetViolations");
+    }
+}
+
 void Schedule::SetSnapshotCapture(Snapshot* snapshot, const ComponentMask& types, Phase phase) noexcept {
     mSnapshot      = snapshot;
     mSnapshotTypes = types;
@@ -402,6 +627,7 @@ core::Result Schedule::RunPhaseSerial(Phase phase) noexcept {
     for (const SystemId system : mOrder[static_cast<size_t>(phase)]) {
         SystemRecord& record = *mSystems[system.mValue];
         ++used;
+        record.mJobs = nullptr;
         RunSystem(record, base + used, core::GetSystemAllocator());
     }
     return EndPhase(phase, used);
@@ -425,6 +651,7 @@ core::Result Schedule::RunPhase(Phase phase, job::JobSystem& jobs) noexcept {
             SystemRecord& record = *mSystems[system.mValue];
             ++used;
             record.mRunVersion = base + used;
+            record.mJobs       = &jobs;
             record.mDone       = jobs.CreateCounter();
             OYI_CHECK(record.mDone.IsValid(), "Schedule: counter pool exhausted");
             if (record.mDesc.mMainThread) {
