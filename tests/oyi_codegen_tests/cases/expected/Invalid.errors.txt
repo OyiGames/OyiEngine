@@ -1,0 +1,27 @@
+Invalid.h:17:23: error: [OYI-C001] annotated declaration must be a 'struct' at namespace scope
+Invalid.h:22:1: error: [OYI-C006] 5 byte(s) of implicit tail padding in 'BadOptions'; add 'std::uint8_t mPad[5] = {};' as the last field
+Invalid.h:22:30: error: [OYI-C012] unknown option 'Flying'; allowed: ['Chunk', 'Replicated', 'Tag']
+Invalid.h:22:43: error: [OYI-C002] base classes are not allowed
+Invalid.h:23:20: error: [OYI-C004] field 'mPlainInt' has type 'int'; use a fixed-width integer (std::int32_t, std::uint8_t, ...)
+Invalid.h:24:20: error: [OYI-C004] field 'mPointer' has type 'std::uint64_t *' which is not allowed; components store handles (oyi::core::Handle<Tag>), never pointers or references
+Invalid.h:25:20: error: [OYI-C004] field 'mPlain' has type 'Plain'; embedded structs must be marked OYI_STRUCT or OYI_COMPONENT
+Invalid.h:26:1: error: [OYI-C006] 28 byte(s) of implicit padding before field 'mUninitialized'; add 'std::uint8_t mPad[28] = {};' or reorder fields
+Invalid.h:26:20: error: [OYI-C005] field 'mUninitialized' has no default member initializer
+Invalid.h:27:20: error: [OYI-C007] field 'mBits' is a bit-field; use explicit masks instead
+Invalid.h:28:1: error: [OYI-C006] 1 byte(s) of implicit padding before field 'mQuantizedInt'; add 'std::uint8_t mPad[1] = {};' or reorder fields
+Invalid.h:28:44: error: [OYI-C013] field 'mQuantizedInt': Quantize only applies to float and double fields
+Invalid.h:29:1: error: [OYI-C006] 2 byte(s) of implicit padding before field 'mUnknownOption'; add 'std::uint8_t mPad[2] = {};' or reorder fields
+Invalid.h:29:27: error: [OYI-C012] unknown option 'Loud'; allowed: ['Hidden', 'Quantize', 'Replicated']
+Invalid.h:30:19: error: [OYI-C009] padding field 'mPadX' must be std::uint8_t or std::uint8_t[N]
+Invalid.h:31:19: error: [OYI-C016] field 'mPad': multi-dimensional arrays are not allowed
+Invalid.h:32:18: error: [OYI-C003] virtual functions are not allowed
+Invalid.h:33:5: error: [OYI-C003] user-declared constructors and destructors are not allowed
+Invalid.h:34:1: error: [OYI-C011] all fields must be public
+Invalid.h:35:18: error: [OYI-C011] field 'mSecret' must be public
+Invalid.h:35:1: error: [OYI-C006] 16 byte(s) of implicit padding before field 'mSecret'; add 'std::uint8_t mPad[16] = {};' or reorder fields
+Invalid.h:41:12: error: [OYI-C017] field 'mLegacy': enum 'Legacy' must be 'enum class' with a fixed-width underlying type
+Invalid.h:42:1: error: [OYI-C006] 4 byte(s) of implicit padding before field 'mPad'; add 'std::uint8_t mPad[4] = {};' or reorder fields
+Invalid.h:45:1: error: [OYI-C006] 2 byte(s) of implicit tail padding in 'ImplicitPadding'; add 'std::uint8_t mPad[2] = {};' as the last field
+Invalid.h:47:1: error: [OYI-C006] 3 byte(s) of implicit padding before field 'mWide'; add 'std::uint8_t mPad[3] = {};' or reorder fields
+Invalid.h:51:27: error: [OYI-C008] a Tag component must not have fields
+Invalid.h:56:12: error: [OYI-C010] nested type declarations are not allowed; declare the type at namespace scope

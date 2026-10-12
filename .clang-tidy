@@ -67,3 +67,6 @@ CheckOptions:
   readability-identifier-naming.MacroDefinitionPrefix:    OYI_
   misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
   cppcoreguidelines-macro-usage.AllowedRegexp: '^OYI_'
+  # clang-tidy 23 moved hicpp-signed-bitwise into bugprone-*, which enables it here. Positive
+  # literals (the `0` in `1u << 0`) cannot introduce sign problems, so leave them alone.
+  bugprone-signed-bitwise.IgnorePositiveIntegerLiterals: true

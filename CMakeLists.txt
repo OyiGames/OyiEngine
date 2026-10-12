@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CTest)
 include(GNUInstallDirs)
 include(OyiBuildSettings)
+include(OyiCodegen)
 include(OyiModule)
 
 option(OYI_BUILD_TOOLS "Build the oyi command-line tools" ON)

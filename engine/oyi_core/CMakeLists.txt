@@ -1,7 +1,11 @@
 oyi_add_module(core
     PUBLIC_HEADERS
+        include/oyi_core/Annotations.h
         include/oyi_core/Assert.h
+        include/oyi_core/EnumFlags.h
         include/oyi_core/Handle.h
+        include/oyi_core/Schema.h
+        include/oyi_core/TypeId.h
         include/oyi_core/Version.h
     SOURCES
         src/oyi_core/Assert.cpp

@@ -29,7 +29,10 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
 - Files: one primary type per file, named `PascalCase.h` / `PascalCase.cpp`; directories lower case.
 - Includes: angle brackets only, `#include <oyi_mod/File.h>`; a `.cpp` includes its own header first;
   top-level include directories carry the `oyi_` prefix.
-- Components (POD): no virtual functions, no pointers, explicit padding, every field value-initialized.
+- Components (POD) are declared with `OYI_COMPONENT` / `OYI_STRUCT` from `<oyi_core/Annotations.h>` and
+  listed under `COMPONENT_HEADERS` in CMake: no virtual functions, no pointers, fixed-width integers,
+  explicit padding, every field value-initialized. `tools/codegen` enforces the rules at build time
+  and emits the reflection tables.
 - Inside jobs: no `std::function`, no direct TLS, no blocking I/O, no global RNG, no wall-clock time.
 - Doc comments use `///`, one sentence on what the function does and when it fails.
 - `TODO` must reference an issue: `// TODO(#123): ...`.
@@ -58,5 +61,6 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
 | Static analysis | `clang-tidy` (naming, bugprone, performance, modernize, readability) |
 | Python scripts | `ruff check` and `ruff format --check` |
 | Conventions | `python scripts/check_sources.py` |
+| Component rules | `tools/codegen` during the build; golden tests in `tests/oyi_codegen_tests` |
 | Header self-containment | `cmake --build --preset <preset>-verify-headers` |
 | Memory and UB | ASan + UBSan preset on every PR |

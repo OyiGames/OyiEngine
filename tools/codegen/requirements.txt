@@ -1,0 +1,2 @@
+# Python bindings only; the libclang shared library comes from the host toolchain (see cmake/OyiCodegen.cmake).
+clang==21.1.7

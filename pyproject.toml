@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 120
-target-version = "py312"
-src = ["scripts", "tools"]
+target-version = "py311"
+src = ["scripts", "tools/codegen", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
