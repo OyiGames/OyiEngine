@@ -2,3 +2,4 @@
 #   platform <- core <- job <- ecs <- transform <- script / physics / net
 add_subdirectory(oyi_core)
 add_subdirectory(oyi_job)
+add_subdirectory(oyi_ecs)

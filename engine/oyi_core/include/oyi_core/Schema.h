@@ -67,6 +67,14 @@ struct ComponentInfo {
     /// FNV-1a over name, type, offset and size of every field plus size and alignment.
     /// Changes exactly when the memcpy layout changes; snapshots and replication key on it.
     uint64_t mLayoutHash = 0;
+    /// A value-initialized instance (`T{}`), mSize bytes long: storage copies it to give new
+    /// components their declared default member initializers without running a constructor.
+    const void* mDefault = nullptr;
 };
+
+/// Maps a reflected component type to its ComponentInfo. Specialized by tools/codegen for every
+/// OYI_COMPONENT; `ComponentTraits<T>::kInfo` is how typed APIs reach the table.
+template <typename T>
+struct ComponentTraits;
 
 } // namespace oyi::core
