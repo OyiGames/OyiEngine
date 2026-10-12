@@ -27,11 +27,15 @@ struct EpilogueTask {
     uint32_t mChunkCount          = 0;
 };
 
+// The signature is fixed by JobFunction; the record is only read here.
+// NOLINTNEXTLINE(misc-const-correctness)
 void RunChunk(JobContext& context, void* data) {
     const auto* const task = static_cast<const ChunkTask*>(data);
     task->mFunction(context, task->mData, task->mBegin, task->mEnd);
 }
 
+// The signature is fixed by JobFunction; the record is only read here.
+// NOLINTNEXTLINE(misc-const-correctness)
 void RunEpilogue(JobContext& context, void* data) {
     const auto* const task = static_cast<const EpilogueTask*>(data);
     task->mEpilogue(context, task->mData, task->mChunkCount);

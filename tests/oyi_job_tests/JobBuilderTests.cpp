@@ -33,6 +33,7 @@ struct Numbered {
     Recorder* mRecorder = nullptr;
     uint32_t mId        = 0;
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     static void Run(JobContext& /*context*/, void* data) {
         const auto* const self = static_cast<const Numbered*>(data);
         self->mRecorder->mOrder.push_back(self->mId);
