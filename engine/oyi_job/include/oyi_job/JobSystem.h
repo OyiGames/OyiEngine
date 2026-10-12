@@ -33,9 +33,9 @@ namespace oyi::job {
 class JobSystem {
 public:
     struct Config {
-        uint32_t mWorkerCount    = 0;    ///< 0 picks hardware threads minus one, at least one
-        uint32_t mMaxJobs        = 4096; ///< jobs queued, waiting or running at the same time
-        uint32_t mMaxCounters    = 1024;
+        uint32_t mWorkerCount = 0; ///< 0 asks oyi_platform: big cores minus the main thread, plus half the little ones
+        uint32_t mMaxJobs     = 4096; ///< jobs queued, waiting or running at the same time
+        uint32_t mMaxCounters = 1024;
         uint32_t mSpinIterations = 64; ///< yields before a thread falls back to a system wait
         core::TaggedHeap::Config mFrameHeap{};
     };

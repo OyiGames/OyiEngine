@@ -10,6 +10,7 @@ English: [README.md](README.md)
   （`ComponentInfo::mDefault`），存储层把它拷进新组件；每个组件生成 `oyi::core::ComponentTraits<X>` 特化，
   类型化 API 通过它的 `kInfo` 找到表；
 - `<oyi_mod/X.schema.json>`：同样的数据，给工具和编辑器用。
+- `<oyi_mod/X.d.luau>`：每条记录的 Luau `export type`（完整形态与 `Partial` 形态），给脚本绑定用；`oyi` 库本身的声明在 `engine/oyi_script/luau/oyi.d.luau`（ADR-0012）。
 
 `oyi_add_module` 的 `COMPONENT_HEADERS` 里列出的头文件由 CMake 自动跑生成器（见 `cmake/OyiCodegen.cmake`）。
 `cmake --build --target codegen` 只跑生成器。

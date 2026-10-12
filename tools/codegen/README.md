@@ -11,6 +11,8 @@ libclang, validates every `OYI_COMPONENT` / `OYI_STRUCT` against the POD rules, 
   storage copies into new components, and every component a `oyi::core::ComponentTraits<X>`
   specialization whose `kInfo` is how typed APIs reach the table;
 - `<oyi_mod/X.schema.json>`: the same data for tools and the editor.
+- `<oyi_mod/X.d.luau>`: Luau `export type`s of every record (full and `Partial` shapes) for the script
+  bindings; `engine/oyi_script/luau/oyi.d.luau` declares the `oyi` library itself (ADR-0012).
 
 CMake runs it automatically for headers listed under `COMPONENT_HEADERS` in `oyi_add_module`
 (see `cmake/OyiCodegen.cmake`). `cmake --build --target codegen` runs only the generators.

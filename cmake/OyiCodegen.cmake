@@ -1,8 +1,8 @@
 # Build-time reflection generation (ADR-0011).
 #
 # Headers listed in oyi_add_module(... COMPONENT_HEADERS ...) are parsed with libclang by
-# tools/codegen and turned into <oyi_mod/X.gen.h> plus X.schema.json under
-# ${CMAKE_CURRENT_BINARY_DIR}/generated/include, which joins the module's public header set.
+# tools/codegen and turned into <oyi_mod/X.gen.h> plus X.schema.json and X.d.luau (ADR-0012) under
+# ${CMAKE_CURRENT_BINARY_DIR}/generated/include; the header joins the module's public header set.
 # `cmake --build --target codegen` runs only the generators (CMake 3.31 CODEGEN).
 #
 # Requirements, checked at configure time:
@@ -134,9 +134,10 @@ function(oyi_target_codegen target)
         cmake_path(REMOVE_EXTENSION header LAST_ONLY OUTPUT_VARIABLE stem)
         set(gen_h "${gen_root}/${stem}.gen.h")
         set(gen_json "${gen_root}/${stem}.schema.json")
+        set(gen_luau "${gen_root}/${stem}.d.luau")
         set(depfile "${CMAKE_CURRENT_BINARY_DIR}/generated/${stem}.d")
         add_custom_command(
-            OUTPUT "${gen_h}" "${gen_json}"
+            OUTPUT "${gen_h}" "${gen_json}" "${gen_luau}"
             COMMAND "${Python3_EXECUTABLE}" -m oyi_codegen generate "${header}"
                 --include-root "${ARG_INCLUDE_ROOT}"
                 --out-dir "${gen_root}"

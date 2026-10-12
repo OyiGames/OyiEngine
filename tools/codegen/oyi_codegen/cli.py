@@ -2,7 +2,7 @@
 
     python -m oyi_codegen generate <include-relative header> --include-root DIR --out-dir DIR
                                    [--depfile FILE] [--libclang PATH] [-- <clang args>]
-    python -m oyi_codegen validate <header path> [--libclang PATH] [-- <clang args>]
+    python -m oyi_codegen validate <header path> [--json] [--luau] [--libclang PATH] [-- <clang args>]
 
 Diagnostics are printed as `file:line:col: error: [OYI-Cnnn] message` so build systems and IDEs link them.
 Exit code 0 on success, 1 on validation errors, 2 on usage errors.
@@ -52,15 +52,18 @@ def cmd_generate(args: argparse.Namespace, clang_args: list[str]) -> int:
     stem, _ = os.path.splitext(header)
     gen_h = os.path.join(args.out_dir, stem + ".gen.h")
     gen_json = os.path.join(args.out_dir, stem + ".schema.json")
+    gen_luau = os.path.join(args.out_dir, stem + ".d.luau")
     os.makedirs(os.path.dirname(gen_h), exist_ok=True)
     with open(gen_h, "w", encoding="ascii", newline="\n") as fh:
         fh.write(emit.render_header(schema))
     with open(gen_json, "w", encoding="ascii", newline="\n") as fh:
         fh.write(emit.render_json(schema))
+    with open(gen_luau, "w", encoding="ascii", newline="\n") as fh:
+        fh.write(emit.render_luau_types(schema))
     if args.depfile:
         os.makedirs(os.path.dirname(os.path.abspath(args.depfile)), exist_ok=True)
         with open(args.depfile, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(emit.render_depfile([gen_h], schema.dependencies))
+            fh.write(emit.render_depfile([gen_h, gen_json, gen_luau], schema.dependencies))
     return 0
 
 
@@ -70,6 +73,8 @@ def cmd_validate(args: argparse.Namespace, clang_args: list[str]) -> int:
     code = _report(diagnostics)
     if code == 0 and schema is not None and args.json:
         sys.stdout.write(emit.render_json(schema))
+    if code == 0 and schema is not None and args.luau:
+        sys.stdout.write(emit.render_luau_types(schema))
     return code
 
 
@@ -80,7 +85,7 @@ def main(argv: list[str]) -> int:
     )
     sub = ap.add_subparsers(dest="command", required=True)
 
-    gen = sub.add_parser("generate", help="emit <name>.gen.h and <name>.schema.json for one header")
+    gen = sub.add_parser("generate", help="emit <name>.gen.h, <name>.schema.json and <name>.d.luau for one header")
     gen.add_argument("header", help="header path relative to --include-root, e.g. oyi_transform/Components.h")
     gen.add_argument("--include-root", required=True)
     gen.add_argument("--out-dir", required=True)
@@ -91,6 +96,7 @@ def main(argv: list[str]) -> int:
     val = sub.add_parser("validate", help="check one header against the component rules")
     val.add_argument("header", help="path to the header")
     val.add_argument("--json", action="store_true", help="print the schema JSON on success")
+    val.add_argument("--luau", action="store_true", help="print the Luau type definitions on success")
     val.add_argument("--libclang")
     val.set_defaults(func=cmd_validate)
 

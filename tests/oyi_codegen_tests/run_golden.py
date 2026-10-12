@@ -5,7 +5,8 @@
 
 Every cases/<Name>.h is run through the generator. If cases/expected/<Name>.errors.txt exists the
 header is expected to fail validation with exactly those diagnostics (paths reduced to basenames);
-otherwise cases/expected/<Name>.json must equal the emitted schema JSON. --update re-records.
+otherwise cases/expected/<Name>.json must equal the emitted schema JSON and
+cases/expected/<Name>.d.luau the emitted Luau type definitions. --update re-records.
 """
 
 from __future__ import annotations
@@ -71,6 +72,7 @@ def main(argv: list[str]) -> int:
         name = os.path.splitext(case)[0]
         expected_errors = os.path.join(expected_dir, f"{name}.errors.txt")
         expected_json = os.path.join(expected_dir, f"{name}.json")
+        expected_luau = os.path.join(expected_dir, f"{name}.d.luau")
 
         if os.path.exists(expected_errors) or (args.update and not os.path.exists(expected_json)):
             result = run_codegen(
@@ -107,15 +109,20 @@ def main(argv: list[str]) -> int:
             failures += 1
             continue
         actual = read(os.path.join(args.work, f"{name}.schema.json")) or ""
+        actual_luau = read(os.path.join(args.work, f"{name}.d.luau")) or ""
         generated_header = read(os.path.join(args.work, f"{name}.gen.h")) or ""
         if re.search(r"[A-Za-z]:[\\/]", generated_header):
             print(f"FAIL {case}: generated header contains an absolute path")
             failures += 1
         if args.update:
             write(expected_json, actual)
-            print(f"updated {expected_json}")
+            write(expected_luau, actual_luau)
+            print(f"updated {expected_json} and {expected_luau}")
         elif actual != read(expected_json):
             print(f"FAIL {case}: schema differs from {expected_json}\n--- actual\n{actual}")
+            failures += 1
+        elif actual_luau != read(expected_luau):
+            print(f"FAIL {case}: Luau types differ from {expected_luau}\n--- actual\n{actual_luau}")
             failures += 1
         else:
             print(f"ok   {case}")

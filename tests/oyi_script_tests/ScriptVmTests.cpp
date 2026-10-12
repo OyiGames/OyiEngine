@@ -6,9 +6,13 @@
 #include <oyi_ecs/World.h>
 #include <oyi_script/ScriptVm.h>
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <fstream>
+#include <iterator>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -147,6 +151,22 @@ TEST_CASE("a call that overruns its time budget is interrupted and the VM stays 
     // A module whose top level never ends is cut short too.
     CHECK_FALSE(vm.Load("forever", "while true do end").has_value());
     CHECK(vm.GetStats().mInterrupts == 2);
+}
+
+TEST_CASE("the type definitions codegen writes for the fixture are a valid Luau module", "[script][vm][codegen]") {
+    std::ifstream file(OYI_ECS_FIXTURE_GENERATED_DIR "/oyi_ecs_fixture/Components.d.luau");
+    REQUIRE(file.is_open());
+    const std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    CHECK(source.contains("export type Position = {"));
+    CHECK(source.contains("export type HealthPartial = {"));
+    CHECK(source.contains("mLastAttacker: Entity"));
+    CHECK(source.contains("mMatrix: { number }"));
+    CHECK(source.contains("mObject: Handle"));
+    CHECK(source.contains("export type Frozen = {}"));
+    Fixture f;
+    ScriptVm vm(f.mAllocator, f.mWorld, kSmall);
+    INFO(vm.GetLastError());
+    CHECK(vm.Load("types", source).has_value());
 }
 
 TEST_CASE("loading a name again replaces the module", "[script][vm]") {

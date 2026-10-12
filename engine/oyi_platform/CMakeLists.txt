@@ -1,0 +1,10 @@
+oyi_add_module(platform
+    PUBLIC_HEADERS
+        include/oyi_platform/Clock.h
+        include/oyi_platform/Thread.h
+        include/oyi_platform/Topology.h
+    SOURCES
+        src/oyi_platform/Clock.cpp
+        src/oyi_platform/Thread.cpp
+        src/oyi_platform/Topology.cpp
+)

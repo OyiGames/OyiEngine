@@ -11,3 +11,6 @@ oyi_add_module(script
     DEPS oyi::ecs oyi::core
     PRIVATE_DEPS unofficial::luau::Luau.VM unofficial::luau::Luau.Compiler
 )
+
+# The oyi library's type definitions for luau-analyze and editors (ADR-0012).
+install(FILES luau/oyi.d.luau DESTINATION "${CMAKE_INSTALL_DATADIR}/oyi/luau")
