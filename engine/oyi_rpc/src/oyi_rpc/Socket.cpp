@@ -40,6 +40,7 @@ namespace {
 using NativeSocket                    = SOCKET;
 constexpr NativeSocket kNativeInvalid = INVALID_SOCKET;
 using SocketLength                    = int;
+using BufferLength                    = int; // what send / recv take
 
 /// WSAStartup once per process; never undone (the process exit cleans up).
 void EnsureStarted() noexcept {
@@ -62,6 +63,7 @@ void CloseNative(NativeSocket socket) noexcept {
 using NativeSocket                    = int;
 constexpr NativeSocket kNativeInvalid = -1;
 using SocketLength                    = socklen_t;
+using BufferLength                    = size_t;
 
 void EnsureStarted() noexcept {}
 
@@ -93,8 +95,8 @@ void SetNoDelay(NativeSocket socket) noexcept {
     FD_ZERO(&set);
     FD_SET(socket, &set);
     timeval timeout{};
-    timeout.tv_sec  = static_cast<long>(timeoutMilliseconds / 1000);
-    timeout.tv_usec = static_cast<long>((timeoutMilliseconds % 1000) * 1000);
+    timeout.tv_sec  = static_cast<decltype(timeout.tv_sec)>(timeoutMilliseconds / 1000);
+    timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>((timeoutMilliseconds % 1000) * 1000);
 #ifdef _WIN32
     const int ready = select(0, writable ? nullptr : &set, writable ? &set : nullptr, nullptr, &timeout);
 #else
@@ -193,7 +195,7 @@ core::Result TcpStream::SendAll(std::span<const std::byte> data) noexcept {
     }
     size_t sent = 0;
     while (sent < data.size()) {
-        const auto chunk = static_cast<int>(std::min<size_t>(data.size() - sent, 1u << 20u));
+        const auto chunk = static_cast<BufferLength>(std::min<size_t>(data.size() - sent, 1u << 20u));
         const auto wrote = send(ToNative(mHandle), reinterpret_cast<const char*>(data.data() + sent), chunk, 0);
         if (wrote <= 0) {
             return core::Fail(core::ErrorCode::IoFailure, "TcpStream: the connection broke while sending");
@@ -213,7 +215,7 @@ core::Expected<size_t> TcpStream::Receive(std::span<std::byte> buffer, uint32_t 
         return core::Fail(core::ErrorCode::Timeout, "TcpStream: nothing arrived in time");
     }
     const auto got =
-        recv(ToNative(mHandle), reinterpret_cast<char*>(buffer.data()), static_cast<int>(buffer.size()), 0);
+        recv(ToNative(mHandle), reinterpret_cast<char*>(buffer.data()), static_cast<BufferLength>(buffer.size()), 0);
     if (got < 0) {
         return core::Fail(core::ErrorCode::IoFailure, "TcpStream: the connection broke while receiving");
     }
