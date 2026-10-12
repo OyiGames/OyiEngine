@@ -10,4 +10,5 @@ oyi_add_module(job
         src/oyi_job/JobSystem.cpp
         src/oyi_job/ParallelFor.cpp
     DEPS oyi::core
+    PRIVATE_DEPS oyi::platform
 )

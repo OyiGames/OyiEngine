@@ -7,13 +7,19 @@
 #include <oyi_core/TaggedHeap.h>
 #include <oyi_job/Job.h>
 #include <oyi_job/JobSystem.h>
+#include <oyi_platform/Thread.h>
+#include <oyi_platform/Topology.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
+#include <system_error>
 #include <thread>
 
 namespace oyi::job {
@@ -86,8 +92,8 @@ JobSystem::JobSystem(core::Allocator& allocator, Config config)
     , mMainThreadId(std::this_thread::get_id())
     , mThreads(&mResource) {
     if (mConfig.mWorkerCount == 0) {
-        const uint32_t hardware = std::thread::hardware_concurrency();
-        mConfig.mWorkerCount    = hardware > 1 ? hardware - 1 : 1;
+        // ADR-0009: workers are counted from the big cores; the main thread takes one of them.
+        mConfig.mWorkerCount = platform::RecommendedWorkerCount(platform::QueryCoreTopology());
     }
     OYI_CHECK(mConfig.mMaxJobs > 0, "JobSystem: the job pool must not be empty");
     OYI_CHECK(mConfig.mMaxCounters > 0, "JobSystem: the counter pool must not be empty");
@@ -364,6 +370,14 @@ void JobSystem::Complete(JobRecord* job) noexcept {
 }
 
 void JobSystem::WorkerMain(uint32_t workerIndex) noexcept {
+    {
+        // "oyi.worker.N" for debuggers and profilers.
+        std::array<char, 24> name{'o', 'y', 'i', '.', 'w', 'o', 'r', 'k', 'e', 'r', '.'};
+        constexpr size_t kPrefix = 11;
+        const auto [end, error]  = std::to_chars(name.data() + kPrefix, name.data() + name.size(), workerIndex);
+        const size_t length      = error == std::errc{} ? static_cast<size_t>(end - name.data()) : kPrefix;
+        platform::SetCurrentThreadName(std::string_view(name.data(), length));
+    }
     Worker& worker = mWorkers[workerIndex];
     while (true) {
         JobRecord* job = TryPop(JobPriority::Latent);
