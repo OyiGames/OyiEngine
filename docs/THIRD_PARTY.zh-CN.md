@@ -13,7 +13,7 @@ English: [THIRD_PARTY.md](THIRD_PARTY.md)
 | GLM | vcpkg | MIT | 标量数学 | 计划 |
 | Google Highway | vcpkg | Apache-2.0 | 批量 SIMD | 计划 |
 | FlatBuffers | vcpkg | Apache-2.0 | 序列化 / 协议 | 计划 |
-| Luau | vcpkg | MIT | 脚本 | 计划 |
+| Luau | vcpkg（0.741） | MIT | 脚本（`oyi_script`） | 使用中 |
 | Dear ImGui / ImPlot | vcpkg | MIT | 工具 UI | 计划 |
 | Google Benchmark | vcpkg | Apache-2.0 | 基准 | 计划 |
 | Crashpad | vcpkg | Apache-2.0 | 崩溃上报 | 计划 |

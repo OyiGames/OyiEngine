@@ -14,7 +14,7 @@ same pull request. NOTICE files of Apache-2.0 components ship with release packa
 | GLM | vcpkg | MIT | Scalar math | Planned |
 | Google Highway | vcpkg | Apache-2.0 | Batch SIMD | Planned |
 | FlatBuffers | vcpkg | Apache-2.0 | Serialization / protocol | Planned |
-| Luau | vcpkg | MIT | Scripting | Planned |
+| Luau | vcpkg (0.741) | MIT | Scripting (`oyi_script`) | In use |
 | Dear ImGui / ImPlot | vcpkg | MIT | Tool UI | Planned |
 | Google Benchmark | vcpkg | Apache-2.0 | Benchmarks | Planned |
 | Crashpad | vcpkg | Apache-2.0 | Crash reporting | Planned |
