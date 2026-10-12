@@ -8,6 +8,7 @@
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
+#include <oyi_ecs/Resource.h>
 #include <oyi_ecs/World.h>
 
 #include <cstdint>
@@ -81,6 +82,10 @@ struct SystemDesc {
     ComponentMask mOptional;
     MessageMask mSends;    ///< message types this system may send (ADR-0007: MessageSender<M>)
     MessageMask mReceives; ///< message types queued for this system
+    /// Resources (ADR-0007: Resource<T>) this system reads and writes; conflict-checked like
+    /// components, except that resources registered as Automatic are ordered by the schedule.
+    ResourceMask mReadResources;
+    ResourceMask mWriteResources;
     /// Runs on the thread that calls RunPhase instead of on a worker (ADR-0006: the managed
     /// system group). Ordered and conflict-checked like any other system; the main thread runs it
     /// as soon as its predecessors are done and helps with jobs while it waits.
@@ -136,6 +141,36 @@ public:
     [[nodiscard]] bool CanWrite(ComponentTypeIndex type) const noexcept { return mDesc.mWrite.Test(type); }
     [[nodiscard]] bool CanSend(MessageTypeIndex type) const noexcept { return mDesc.mSends.Test(type); }
     [[nodiscard]] bool CanReceive(MessageTypeIndex type) const noexcept { return mDesc.mReceives.Test(type); }
+    [[nodiscard]] bool CanReadResource(ResourceTypeIndex type) const noexcept {
+        return mDesc.mReadResources.Test(type) || mDesc.mWriteResources.Test(type);
+    }
+    [[nodiscard]] bool CanWriteResource(ResourceTypeIndex type) const noexcept {
+        return mDesc.mWriteResources.Test(type);
+    }
+
+    /// A resource (ADR-0007: Resource<T>); nullptr when none is registered under the index. The
+    /// caller names the type it registered.
+    template <typename T>
+    [[nodiscard]] const T* GetResource(ResourceTypeIndex type) const noexcept {
+        OYI_ASSERT(CanReadResource(type), "system reads a resource it did not declare");
+        return mWorld.GetResources().Get<T>(type);
+    }
+
+    template <typename T>
+    [[nodiscard]] T* GetResourceForWrite(ResourceTypeIndex type) noexcept {
+        OYI_ASSERT(CanWriteResource(type), "system writes a resource it did not declare");
+        return mWorld.GetResources().Get<T>(type);
+    }
+
+    [[nodiscard]] const Environment& GetEnvironment() const noexcept {
+        OYI_ASSERT(CanReadResource(kEnvironmentResource), "system reads the Environment without declaring it");
+        return mWorld.GetEnvironment();
+    }
+
+    [[nodiscard]] Environment& GetEnvironmentForWrite() noexcept {
+        OYI_ASSERT(CanWriteResource(kEnvironmentResource), "system writes the Environment without declaring it");
+        return mWorld.GetEnvironmentForWrite();
+    }
 
     /// Queues a message for the receivers of `type` whose query matches `target` (every receiver
     /// when `target` is invalid). Delivered at the end of this phase, read on their next run.

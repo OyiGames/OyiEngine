@@ -11,6 +11,7 @@ oyi_add_test(oyi_ecs_tests
         ManagedTests.cpp
         MessageTests.cpp
         QueryTests.cpp
+        ResourceTests.cpp
         ScheduleTests.cpp
         SnapshotTests.cpp
         WorldTests.cpp

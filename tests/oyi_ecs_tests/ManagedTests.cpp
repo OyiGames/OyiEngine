@@ -56,17 +56,19 @@ using namespace oyi::ecs_fixture;
 }
 
 [[nodiscard]] SystemDesc Access(std::string_view name, Phase phase, ComponentMask read, ComponentMask write) {
-    return SystemDesc{.mName       = name,
-                      .mPhase      = phase,
-                      .mRead       = read,
-                      .mWrite      = write,
-                      .mExclude    = ComponentMask{},
-                      .mOptional   = ComponentMask{},
-                      .mSends      = MessageMask{},
-                      .mReceives   = MessageMask{},
-                      .mMainThread = false,
-                      .mFunction   = nullptr,
-                      .mData       = nullptr};
+    return SystemDesc{.mName           = name,
+                      .mPhase          = phase,
+                      .mRead           = read,
+                      .mWrite          = write,
+                      .mExclude        = ComponentMask{},
+                      .mOptional       = ComponentMask{},
+                      .mSends          = MessageMask{},
+                      .mReceives       = MessageMask{},
+                      .mReadResources  = oyi::ecs::ResourceMask{},
+                      .mWriteResources = oyi::ecs::ResourceMask{},
+                      .mMainThread     = false,
+                      .mFunction       = nullptr,
+                      .mData           = nullptr};
 }
 
 /// A managed "brain": reads its owner's previous Position, counts updates, drains Health.

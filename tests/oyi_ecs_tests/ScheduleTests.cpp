@@ -134,17 +134,19 @@ void TraceD(SystemContext& context) {
 
 [[nodiscard]] SystemDesc Describe(std::string_view name, Phase phase, ComponentMask read, ComponentMask write,
                                   oyi::ecs::SystemFunction function, void* data) {
-    return SystemDesc{.mName       = name,
-                      .mPhase      = phase,
-                      .mRead       = read,
-                      .mWrite      = write,
-                      .mExclude    = ComponentMask{},
-                      .mOptional   = ComponentMask{},
-                      .mSends      = oyi::ecs::MessageMask{},
-                      .mReceives   = oyi::ecs::MessageMask{},
-                      .mMainThread = false,
-                      .mFunction   = function,
-                      .mData       = data};
+    return SystemDesc{.mName           = name,
+                      .mPhase          = phase,
+                      .mRead           = read,
+                      .mWrite          = write,
+                      .mExclude        = ComponentMask{},
+                      .mOptional       = ComponentMask{},
+                      .mSends          = oyi::ecs::MessageMask{},
+                      .mReceives       = oyi::ecs::MessageMask{},
+                      .mReadResources  = oyi::ecs::ResourceMask{},
+                      .mWriteResources = oyi::ecs::ResourceMask{},
+                      .mMainThread     = false,
+                      .mFunction       = function,
+                      .mData           = data};
 }
 
 void Populate(Fixture& f, uint32_t count) {

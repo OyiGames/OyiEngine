@@ -5,6 +5,7 @@
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Message.h>
+#include <oyi_ecs/Resource.h>
 #include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/World.h>
 
@@ -65,6 +66,21 @@ public:
     [[nodiscard]] const T* Prev(EntityId entity, ComponentTypeIndex type) const noexcept {
         return mPrev == nullptr ? nullptr : mPrev->Get<T>(entity, type);
     }
+
+    /// Resources are not chunk memory: with nothing else running, the window may use them
+    /// directly. Pointers are for the window's duration only.
+    template <typename T>
+    [[nodiscard]] const T* GetResource(ResourceTypeIndex type) const noexcept {
+        return mWorld.GetResources().Get<T>(type);
+    }
+
+    template <typename T>
+    [[nodiscard]] T* GetResourceForWrite(ResourceTypeIndex type) noexcept {
+        return mWorld.GetResources().Get<T>(type);
+    }
+
+    [[nodiscard]] const Environment& GetEnvironment() const noexcept { return mWorld.GetEnvironment(); }
+    [[nodiscard]] Environment& GetEnvironmentForWrite() noexcept { return mWorld.GetEnvironmentForWrite(); }
 
     /// Calls `fn(EntityId)` for every live entity with all of `all` and none of `none`.
     template <typename Fn>

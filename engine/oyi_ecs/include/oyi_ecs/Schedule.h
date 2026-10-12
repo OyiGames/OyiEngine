@@ -59,7 +59,8 @@ public:
     /// Systems of `phase` in execution order (a topological order with registration order as
     /// the tie-breaker). Empty before Build.
     [[nodiscard]] std::span<const SystemId> GetOrder(Phase phase) const noexcept;
-    /// Direct predecessors of a system from AddOrder.
+    /// Direct predecessors of a system: the AddOrder edges and, after Build, the edges added for
+    /// automatically ordered resources.
     [[nodiscard]] std::span<const SystemId> GetPredecessors(SystemId system) const noexcept;
 
     /// Runs the phase's systems on the job system (the calling thread must be the one that built
@@ -98,6 +99,8 @@ private:
     struct SystemRecord;
 
     static void RunSystemJob(job::JobContext& context, void* data);
+    /// Derives the per-phase order from the current edges and fills `reach` (count x count).
+    [[nodiscard]] core::Result Sort(std::span<uint8_t> reach) noexcept;
     void RunSystem(SystemRecord& record, uint32_t version, core::Allocator& scratch) noexcept;
     [[nodiscard]] core::Result EndPhase(Phase phase, uint32_t versionsUsed) noexcept;
     void RouteMessages(Phase phase) noexcept;
