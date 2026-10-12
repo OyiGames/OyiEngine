@@ -4,6 +4,7 @@
 
 #include <oyi_core/Annotations.h>
 #include <oyi_ecs/Entity.h>
+#include <oyi_ecs/Managed.h>
 
 #include <cstdint>
 
@@ -38,6 +39,11 @@ struct OYI_COMPONENT(Tag) Frozen {};
 struct OYI_COMPONENT(Chunk) ChunkBounds {
     float mMin[3] = {0.0f, 0.0f, 0.0f};
     float mMax[3] = {0.0f, 0.0f, 0.0f};
+};
+
+/// The chunk-side half of a managed Brain: a handle into the pool.
+struct OYI_COMPONENT() BrainRef {
+    oyi::ecs::ManagedId mObject{};
 };
 
 /// Messages are plain OYI_STRUCT records.
