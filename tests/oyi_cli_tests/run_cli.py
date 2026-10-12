@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercises the `oyi` command-line tool (ADR-0016): exit codes, JSON output, error lines.
 
-    run_cli.py --oyi <exe> --cases <codegen golden cases dir> --work <dir>
+run_cli.py --oyi <exe> --cases <codegen golden cases dir> --work <dir>
 """
 
 from __future__ import annotations
