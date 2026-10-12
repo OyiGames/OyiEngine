@@ -29,10 +29,32 @@ namespace oyi::ecs {
 /// add, remove) move rows and invalidate component pointers, so during a frame they are issued
 /// through the command buffer and replayed at a sync point (ADR-0008); direct calls are for setup,
 /// loading and the sync point itself.
+/// What a World is for (ADR-0017). Systems declare the kinds they belong to; a Schedule built
+/// for a world leaves the others out.
+enum class WorldKind : uint8_t {
+    Client,
+    Server,
+    Editor,
+    Baking,
+};
+
+/// A set of WorldKinds, one bit each.
+using WorldKindMask = uint8_t;
+
+[[nodiscard]] constexpr WorldKindMask KindBit(WorldKind kind) noexcept {
+    return static_cast<WorldKindMask>(1u << static_cast<unsigned>(kind));
+}
+
+inline constexpr WorldKindMask kAllWorldKinds = 0xFFu;
+/// Presentation systems (ADR-0001): everything but the server.
+inline constexpr WorldKindMask kPresentationWorldKinds =
+    static_cast<WorldKindMask>(KindBit(WorldKind::Client) | KindBit(WorldKind::Editor) | KindBit(WorldKind::Baking));
+
 class World {
 public:
     struct Config {
         uint32_t mChunkSize = 16 * 1024; ///< ADR-0005: 16 KB to start with, tuned on target phones
+        WorldKind mKind     = WorldKind::Client;
     };
 
     struct Stats {
@@ -53,6 +75,9 @@ public:
     World& operator=(const World&) = delete;
     World& operator=(World&&)      = delete;
     ~World();
+
+    /// What this world is for (ADR-0017): a server never instantiates presentation systems.
+    [[nodiscard]] WorldKind GetKind() const noexcept { return mConfig.mKind; }
 
     [[nodiscard]] ComponentRegistry& GetComponents() noexcept { return mComponents; }
     [[nodiscard]] const ComponentRegistry& GetComponents() const noexcept { return mComponents; }

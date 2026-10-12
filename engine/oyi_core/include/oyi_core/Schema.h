@@ -42,6 +42,7 @@ enum class ComponentFlags : uint8_t {
     Tag        = 1u << 0u, ///< no data; presence is the information
     Replicated = 1u << 1u, ///< at least one field is replicated
     Chunk      = 1u << 2u, ///< one value per chunk instead of per entity
+    Predicted  = 1u << 3u, ///< ADR-0017: takes part in client prediction (keeps an N-frame history)
 };
 OYI_ENUM_FLAGS(ComponentFlags);
 

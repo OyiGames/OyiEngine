@@ -23,7 +23,7 @@ class FieldKind(StrEnum):
     PADDING = "Padding"
 
 
-COMPONENT_OPTIONS = {"Tag", "Replicated", "Chunk"}
+COMPONENT_OPTIONS = {"Tag", "Replicated", "Chunk", "Predicted"}
 FIELD_OPTIONS = {"Replicated", "Hidden", "Quantize"}
 STRUCT_OPTIONS: set[str] = set()
 

@@ -68,8 +68,13 @@ public:
     Schedule& operator=(Schedule&&)      = delete;
     ~Schedule();
 
-    /// Fails with InvalidState after Build, InvalidArgument for an unnamed system.
-    [[nodiscard]] core::Expected<SystemId> AddSystem(const SystemDesc& desc) noexcept;
+    /// Fails with InvalidState after Build, InvalidArgument for an unnamed system. `kinds` says
+    /// which worlds the system belongs to (ADR-0017: a server world leaves presentation systems
+    /// out); Build drops systems whose kinds do not include the world's.
+    [[nodiscard]] core::Expected<SystemId> AddSystem(const SystemDesc& desc,
+                                                     WorldKindMask kinds = kAllWorldKinds) noexcept;
+    /// False for a system Build left out because of its kinds.
+    [[nodiscard]] bool IsSystemIncluded(SystemId system) const noexcept;
     /// `before` runs to completion before `after` starts. Both must be in the same phase.
     [[nodiscard]] core::Result AddOrder(SystemId before, SystemId after) noexcept;
     /// Derives the per-phase order. Fails with InvalidState on an unordered conflict pair (see

@@ -41,6 +41,16 @@ struct OYI_COMPONENT(Chunk) ChunkBounds {
     float mMax[3] = {0.0f, 0.0f, 0.0f};
 };
 
+/// Replicated field by field (ADR-0017): two quantized floats and a counter travel, the last
+/// field stays local. Predicted: a client keeps its history for rollback.
+struct OYI_COMPONENT(Predicted) NetPose {
+    OYI_FIELD(Replicated, Quantize = 0.01) float mX = 0.0f;
+    OYI_FIELD(Replicated, Quantize = 0.01) float mY = 0.0f;
+    float mLocalOnly                                = 0.0f;
+    OYI_FIELD(Replicated) uint16_t mHealth          = 100;
+    uint8_t mPad[2]                                 = {};
+};
+
 /// The chunk-side half of a managed Brain: a handle into the pool.
 struct OYI_COMPONENT() BrainRef {
     oyi::ecs::ManagedId mObject{};

@@ -107,6 +107,7 @@ struct Schedule::SystemRecord {
     std::pmr::vector<TaskOwner> mTaskOwners;
     uint32_t mTaskCount   = 0;       ///< chunk tasks of the run in progress
     job::JobSystem* mJobs = nullptr; ///< the job system of the run in progress; nullptr when serial
+    WorldKindMask mKinds  = kAllWorldKinds;
     std::pmr::vector<SystemId> mPredecessors;
     uint32_t mOrderIndex  = 0; ///< position within the phase after Build
     uint32_t mLastVersion = 0;
@@ -139,7 +140,7 @@ Schedule::~Schedule() {
 
 // pmr containers report exhaustion through MemoryResource, which terminates; they never throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-core::Expected<SystemId> Schedule::AddSystem(const SystemDesc& desc) noexcept {
+core::Expected<SystemId> Schedule::AddSystem(const SystemDesc& desc, WorldKindMask kinds) noexcept {
     if (mBuilt) {
         return core::Fail(core::ErrorCode::InvalidState, "Schedule: systems cannot be added after Build");
     }
@@ -153,8 +154,14 @@ core::Expected<SystemId> Schedule::AddSystem(const SystemDesc& desc) noexcept {
     if (record == nullptr) {
         return core::Fail(core::ErrorCode::OutOfMemory, "Schedule: cannot allocate a system record");
     }
+    record->mKinds = kinds;
     mSystems.push_back(record);
     return SystemId{.mValue = static_cast<uint32_t>(mSystems.size() - 1)};
+}
+
+bool Schedule::IsSystemIncluded(SystemId system) const noexcept {
+    OYI_ASSERT(system.mValue < mSystems.size(), "Schedule: unknown system");
+    return (mSystems[system.mValue]->mKinds & KindBit(mWorld.GetKind())) != 0;
 }
 
 // NOLINTNEXTLINE(bugprone-exception-escape)
@@ -180,7 +187,11 @@ core::Result Schedule::Sort(std::span<uint8_t> reach) noexcept {
     std::pmr::vector<uint32_t> indegree(count, 0, &mResource);
     std::pmr::vector<SystemId> ready(&mResource);
     for (uint32_t s = 0; s < count; ++s) {
-        indegree[s] = static_cast<uint32_t>(mSystems[s]->mPredecessors.size());
+        uint32_t edges = 0;
+        for (const SystemId predecessor : mSystems[s]->mPredecessors) {
+            edges += IsSystemIncluded(predecessor) ? 1 : 0; // edges from systems left out do not count
+        }
+        indegree[s] = edges;
     }
 
     for (uint32_t phase = 0; phase < kPhaseCount; ++phase) {
@@ -189,7 +200,8 @@ core::Result Schedule::Sort(std::span<uint8_t> reach) noexcept {
         // Kahn's algorithm; registration order breaks ties so the result is stable.
         ready.clear();
         for (uint32_t s = 0; s < count; ++s) {
-            if (static_cast<uint32_t>(mSystems[s]->mDesc.mPhase) == phase && indegree[s] == 0) {
+            if (static_cast<uint32_t>(mSystems[s]->mDesc.mPhase) == phase && indegree[s] == 0 &&
+                IsSystemIncluded(SystemId{.mValue = s})) {
                 ready.push_back(SystemId{.mValue = s});
             }
         }
@@ -208,7 +220,8 @@ core::Result Schedule::Sort(std::span<uint8_t> reach) noexcept {
             order.push_back(current);
             for (uint32_t s = 0; s < count; ++s) {
                 const SystemRecord& candidate = *mSystems[s];
-                if (static_cast<uint32_t>(candidate.mDesc.mPhase) != phase) {
+                if (static_cast<uint32_t>(candidate.mDesc.mPhase) != phase ||
+                    !IsSystemIncluded(SystemId{.mValue = s})) {
                     continue;
                 }
                 for (const SystemId predecessor : candidate.mPredecessors) {
@@ -230,7 +243,10 @@ core::Result Schedule::Sort(std::span<uint8_t> reach) noexcept {
         }
         uint32_t inPhase = 0;
         for (uint32_t s = 0; s < count; ++s) {
-            inPhase += static_cast<uint32_t>(mSystems[s]->mDesc.mPhase) == phase ? 1 : 0;
+            inPhase +=
+                static_cast<uint32_t>(mSystems[s]->mDesc.mPhase) == phase && IsSystemIncluded(SystemId{.mValue = s})
+                    ? 1
+                    : 0;
         }
         if (order.size() != inPhase) {
             for (std::pmr::vector<SystemId>& cleared : mOrder) {
@@ -450,7 +466,7 @@ void Schedule::RouteOutbox(MessageBuffer& outbox) noexcept {
             continue; // the target died before the sync point
         }
         for (SystemRecord* const receiver : mSystems) {
-            if (!receiver->mDesc.mReceives.Test(record.mType)) {
+            if (!receiver->mDesc.mReceives.Test(record.mType) || (receiver->mKinds & KindBit(mWorld.GetKind())) == 0) {
                 continue;
             }
             if (targetMask != nullptr && !receiver->mQuery.Matches(*targetMask)) {
