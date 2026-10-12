@@ -6,7 +6,10 @@ Build-time reflection generator for component declarations (ADR-0011). It parses
 libclang, validates every `OYI_COMPONENT` / `OYI_STRUCT` against the POD rules, and emits:
 
 - `<oyi_mod/X.gen.h>`: `constexpr oyi::core::ComponentInfo` tables plus `static_assert`s that pin
-  size, alignment and every field offset, so a layout change without regeneration fails to compile;
+  size, alignment and every field offset, so a layout change without regeneration fails to compile.
+  Each record also gets a value-initialized `kXDefault` instance (`ComponentInfo::mDefault`), which
+  storage copies into new components, and every component a `oyi::core::ComponentTraits<X>`
+  specialization whose `kInfo` is how typed APIs reach the table;
 - `<oyi_mod/X.schema.json>`: the same data for tools and the editor.
 
 CMake runs it automatically for headers listed under `COMPONENT_HEADERS` in `oyi_add_module`

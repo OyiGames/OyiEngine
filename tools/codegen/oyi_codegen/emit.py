@@ -47,11 +47,13 @@ def _record_cpp(r: RecordDecl) -> list[str]:
             lines.append(f"    {_field_initializer(f)},")
         lines.append("};")
     fields_span = fields_symbol if r.fields else "{}"
+    default_symbol = f"k{r.name}Default"
+    lines.append(f"inline constexpr {r.name} {default_symbol}{{}};")
     lines.append(
         f"inline constexpr {_CORE}ComponentInfo {info_symbol}{{"
         f'.mName = "{r.qualified_name}", .mTypeId = {_CORE}TypeId{{.mValue = {r.type_id:#018x}ull}}, '
         f".mSize = {r.size}, .mAlign = {r.align}, .mFlags = {_flags_expr('ComponentFlags', r.flags)}, "
-        f".mFields = {fields_span}, .mLayoutHash = {r.layout_hash:#018x}ull}};"
+        f".mFields = {fields_span}, .mLayoutHash = {r.layout_hash:#018x}ull, .mDefault = &{default_symbol}}};"
     )
     drift = f'"oyi_codegen: layout of {r.qualified_name} changed since generation; rebuild to regenerate"'
     lines.append(f"static_assert(sizeof({r.name}) == {r.size}, {drift});")
@@ -90,6 +92,20 @@ def render_header(schema: HeaderSchema) -> str:
         if ns_text:
             out.append(f"}} // namespace {ns_text}")
             out.append("")
+    components = [r for r in schema.records if r.kind == "component"]
+    if components:
+        out.append("namespace oyi::core {")
+        out.append("")
+        for r in components:
+            owner = "::".join(r.namespace)
+            info = f"::{owner}::k{r.name}Info" if owner else f"::k{r.name}Info"
+            out.append("template <>")
+            out.append(f"struct ComponentTraits<::{r.qualified_name}> {{")
+            out.append(f"    static constexpr const ComponentInfo& kInfo = {info};")
+            out.append("};")
+            out.append("")
+        out.append("} // namespace oyi::core")
+        out.append("")
     return "\n".join(out)
 
 

@@ -6,7 +6,9 @@ English: [README.md](README.md)
 `OYI_COMPONENT` / `OYI_STRUCT`，然后生成：
 
 - `<oyi_mod/X.gen.h>`：`constexpr oyi::core::ComponentInfo` 表，附带把大小、对齐和每个字段偏移钉死的
-  `static_assert`，布局改了却没重新生成时直接编译失败；
+  `static_assert`，布局改了却没重新生成时直接编译失败。每个记录还生成一个值初始化的 `kXDefault` 实例
+  （`ComponentInfo::mDefault`），存储层把它拷进新组件；每个组件生成 `oyi::core::ComponentTraits<X>` 特化，
+  类型化 API 通过它的 `kInfo` 找到表；
 - `<oyi_mod/X.schema.json>`：同样的数据，给工具和编辑器用。
 
 `oyi_add_module` 的 `COMPONENT_HEADERS` 里列出的头文件由 CMake 自动跑生成器（见 `cmake/OyiCodegen.cmake`）。
