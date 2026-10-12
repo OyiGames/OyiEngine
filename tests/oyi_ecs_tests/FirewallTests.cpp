@@ -221,7 +221,7 @@ struct Pushers {
 };
 
 void PushBoth(FirewallWindow& window) {
-    auto* const self = window.GetData<Pushers>();
+    const auto* const self = window.GetData<Pushers>();
     Mover(window, self->mDriven, self->mFixture->mTypes).Push(1.0f);
     Mover(window, self->mStatic, self->mFixture->mTypes).Push(1.0f);
 }
