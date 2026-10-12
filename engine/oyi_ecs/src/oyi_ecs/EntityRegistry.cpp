@@ -3,7 +3,9 @@
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace oyi::ecs {
 
@@ -57,6 +59,39 @@ EntityLocation EntityRegistry::GetLocation(EntityId entity) const noexcept {
 void EntityRegistry::SetLocation(EntityId entity, EntityLocation location) noexcept {
     OYI_ASSERT(IsAlive(entity), "EntityRegistry: locating a dead entity");
     mSlots[entity.mIndex].mLocation = location;
+}
+
+uint32_t EntityRegistry::GetGeneration(uint32_t index) const noexcept {
+    return index < mSlots.size() ? mSlots[index].mGeneration : 0;
+}
+
+bool EntityRegistry::IsIndexAlive(uint32_t index) const noexcept {
+    return index < mSlots.size() && mSlots[index].mAlive;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+void EntityRegistry::Restore(std::span<const uint32_t> generations, std::span<const uint8_t> alive) noexcept {
+    OYI_ASSERT(generations.size() == alive.size(), "EntityRegistry: table sizes differ");
+    Clear();
+    mSlots.resize(generations.size());
+    for (size_t index = 0; index < generations.size(); ++index) {
+        OYI_ASSERT(generations[index] != 0, "EntityRegistry: generation zero is the invalid handle");
+        mSlots[index].mGeneration = generations[index];
+        mSlots[index].mAlive      = alive[index] != 0;
+        mAliveCount += alive[index] != 0 ? 1 : 0;
+    }
+    // Dead indices are handed out lowest first: Create pops from the back.
+    for (size_t index = generations.size(); index-- > 0;) {
+        if (alive[index] == 0) {
+            mFreeIndices.push_back(static_cast<uint32_t>(index));
+        }
+    }
+}
+
+void EntityRegistry::Clear() noexcept {
+    mSlots.clear();
+    mFreeIndices.clear();
+    mAliveCount = 0;
 }
 
 } // namespace oyi::ecs

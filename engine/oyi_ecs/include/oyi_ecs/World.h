@@ -183,6 +183,28 @@ public:
     /// vs parallel comparison). Enable bits and versions are not included.
     [[nodiscard]] uint64_t ComputeStateHash() const noexcept;
 
+    // --- the memcpy format (ADR-0013) -----------------------------------------------------------
+
+    /// FNV-1a over the registered component types (name, TypeId, layout hash) in registration
+    /// order: what a saved world is keyed on.
+    [[nodiscard]] uint64_t ComputeSchemaHash() const noexcept;
+    /// Appends the world to `out`: header with the schema hash, the component table, the entity
+    /// table (generations and liveness, so handles survive) and every chunk byte for byte, enable
+    /// bits and versions included. Resources, managed objects and the Environment are not part of
+    /// it. Little-endian, as everything the engine targets.
+    [[nodiscard]] core::Result Save(std::pmr::vector<std::byte>& out) const noexcept;
+    /// The reverse, into an empty World whose registry holds the same component types in the same
+    /// order with the same layouts and whose chunk size matches. Fails with InvalidState when the
+    /// world is not empty, CorruptData for anything that does not match or is truncated (the
+    /// world is left empty), OutOfMemory when storage cannot grow.
+    [[nodiscard]] core::Result Load(std::span<const std::byte> data) noexcept;
+    /// Destroys every entity and archetype; registries, resources and the version stay.
+    void Clear() noexcept;
+
+    /// A new entity in the same archetype with a copy of every component and enable bit of
+    /// `source` (the prototype path of ADR-0013). Fails with NotFound for a dead source.
+    [[nodiscard]] core::Expected<EntityId> CloneEntity(EntityId source) noexcept;
+
 private:
     [[nodiscard]] core::Expected<Archetype*> GetOrCreateArchetype(const ComponentMask& mask) noexcept;
     [[nodiscard]] core::Result MoveEntity(EntityId entity, const ComponentMask& targetMask) noexcept;

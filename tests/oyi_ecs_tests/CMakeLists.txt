@@ -15,6 +15,7 @@ oyi_add_test(oyi_ecs_tests
         QueryTests.cpp
         ResourceTests.cpp
         ScheduleTests.cpp
+        SerializationTests.cpp
         SnapshotTests.cpp
         WorldTests.cpp
     DEPS oyi::ecs oyi::ecs_fixture oyi::job oyi::core

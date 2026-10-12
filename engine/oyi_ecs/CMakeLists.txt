@@ -31,6 +31,7 @@ oyi_add_module(ecs
         src/oyi_ecs/Query.cpp
         src/oyi_ecs/Resource.cpp
         src/oyi_ecs/Schedule.cpp
+        src/oyi_ecs/Serialization.cpp
         src/oyi_ecs/Snapshot.cpp
         src/oyi_ecs/World.cpp
     DEPS oyi::core oyi::job

@@ -54,6 +54,11 @@ public:
     /// enable bits included. Used when an entity changes archetype.
     void CopySharedComponents(const Archetype& source, EntityLocation sourceRow, EntityLocation targetRow) noexcept;
 
+    /// Appends a chunk holding `rows` rows copied byte for byte from `data`, which must be a whole
+    /// chunk of this layout (World::Load). Fails with InvalidArgument on a size or count mismatch
+    /// and OutOfMemory when the chunk cannot be allocated.
+    [[nodiscard]] core::Result RestoreChunk(std::span<const std::byte> data, uint32_t rows) noexcept;
+
     [[nodiscard]] std::byte* GetColumn(uint32_t chunk, const ColumnLayout& column) noexcept;
     [[nodiscard]] const std::byte* GetColumn(uint32_t chunk, const ColumnLayout& column) const noexcept;
     [[nodiscard]] std::span<EntityId> GetEntities(uint32_t chunk) noexcept;
