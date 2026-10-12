@@ -40,7 +40,8 @@ def main(argv: list[str]) -> int:
     expect("version json exit", result.returncode == 0, result.stderr)
     try:
         doc = json.loads(result.stdout)
-        expect("version json fields", set(doc) == {"engine", "protocol", "schemaHash"} and doc["schemaHash"] != "0", result.stdout)
+        fields_ok = set(doc) == {"engine", "protocol", "schemaHash"} and doc["schemaHash"] != "0"
+        expect("version json fields", fields_ok, result.stdout)
     except json.JSONDecodeError:
         expect("version json parse", False, result.stdout)
 
@@ -53,12 +54,20 @@ def main(argv: list[str]) -> int:
     # inspect on missing and damaged files: exit 1 with a JSON error line
     missing = os.path.join(args.work, "missing.oyiw")
     result = run(args.oyi, "world", "inspect", missing, "--json")
-    expect("world missing file", result.returncode == 1 and json.loads(result.stdout)["error"]["code"] == "IoFailure", result.stdout)
+    expect(
+        "world missing file",
+        result.returncode == 1 and json.loads(result.stdout)["error"]["code"] == "IoFailure",
+        result.stdout,
+    )
     damaged = os.path.join(args.work, "damaged.oyib")
     with open(damaged, "wb") as fh:
         fh.write(b"not a blob at all, just some bytes to read")
     result = run(args.oyi, "asset", "inspect", damaged, "--json")
-    expect("asset damaged file", result.returncode == 1 and json.loads(result.stdout)["error"]["code"] == "CorruptData", result.stdout)
+    expect(
+        "asset damaged file",
+        result.returncode == 1 and json.loads(result.stdout)["error"]["code"] == "CorruptData",
+        result.stdout,
+    )
     result = run(args.oyi, "world", "inspect", damaged)
     expect("world damaged text", result.returncode == 1 and "CorruptData" in result.stderr, result.stderr)
     result = run(args.oyi, "world", "inspect", damaged, "--quiet")
@@ -70,7 +79,13 @@ def main(argv: list[str]) -> int:
         result = run(args.oyi, "world", "inspect", world_file, "--json")
         try:
             doc = json.loads(result.stdout)
-            expect("world inspect json", result.returncode == 0 and doc["entityCount"] > 0 and len(doc["archetypes"]) >= 1 and doc["components"][0]["name"].startswith("oyi::"), result.stdout)
+            world_ok = (
+                result.returncode == 0
+                and doc["entityCount"] > 0
+                and len(doc["archetypes"]) >= 1
+                and doc["components"][0]["name"].startswith("oyi::")
+            )
+            expect("world inspect json", world_ok, result.stdout)
         except (json.JSONDecodeError, KeyError):
             expect("world inspect parse", False, result.stdout)
         result = run(args.oyi, "world", "inspect", world_file)
@@ -92,7 +107,8 @@ def main(argv: list[str]) -> int:
     result = run(args.oyi, "schema", "validate", os.path.join(args.cases, "Basic.h"), "--json")
     try:
         doc = json.loads(result.stdout)
-        expect("schema validate json", result.returncode == 0 and doc["records"][0]["name"].startswith("oyi::golden::"), result.stdout[:200])
+        schema_ok = result.returncode == 0 and doc["records"][0]["name"].startswith("oyi::golden::")
+        expect("schema validate json", schema_ok, result.stdout[:200])
     except (json.JSONDecodeError, KeyError):
         expect("schema validate json parse", False, result.stdout[:400] + result.stderr[-400:])
 
