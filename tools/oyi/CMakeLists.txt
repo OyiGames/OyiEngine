@@ -4,8 +4,9 @@ oyi_add_executable(oyi
         src/Common.cpp
         src/Main.cpp
         src/SchemaCommand.cpp
+        src/ServeCommand.cpp
         src/WorldCommand.cpp
-    DEPS    oyi::core oyi::ecs oyi::asset oyi::transform
+    DEPS    oyi::core oyi::ecs oyi::asset oyi::transform oyi::rpc
 )
 
 # Where `oyi schema validate` finds the generator of this checkout. Development defaults; the

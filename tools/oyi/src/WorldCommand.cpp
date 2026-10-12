@@ -73,7 +73,8 @@ void PrintSummaryText(const ecs::WorldFileSummary& summary) {
 
 int RunWorld(std::span<const std::string_view> args) {
     Options options;
-    if (!ParseOptions(args, options) || options.mPositional.size() != 2 || options.mPositional[0] != "inspect") {
+    if (!ParseOptions(args, options) || !options.mNamed.empty() || options.mPositional.size() != 2 ||
+        options.mPositional[0] != "inspect") {
         std::fputs("usage: oyi world inspect <file.oyiw> [--json]\n", stdout);
         return kExitUsage;
     }

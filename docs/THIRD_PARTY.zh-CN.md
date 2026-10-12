@@ -12,7 +12,7 @@ English: [THIRD_PARTY.md](THIRD_PARTY.md)
 | mimalloc | vcpkg | MIT | 全局分配器 | 计划 |
 | GLM | vcpkg | MIT | 标量数学 | 计划 |
 | Google Highway | vcpkg | Apache-2.0 | 批量 SIMD | 计划 |
-| FlatBuffers | vcpkg | Apache-2.0 | 序列化 / 协议 | 计划 |
+| FlatBuffers | vcpkg（25.12.19） | Apache-2.0 | 线上协议（`oyi_rpc`）、描述类资产 | 使用中 |
 | Luau | vcpkg（0.741） | MIT | 脚本（`oyi_script`） | 使用中 |
 | Dear ImGui / ImPlot | vcpkg | MIT | 工具 UI | 计划 |
 | Google Benchmark | vcpkg | Apache-2.0 | 基准 | 计划 |

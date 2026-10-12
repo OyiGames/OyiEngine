@@ -26,8 +26,9 @@ struct Version {
 [[nodiscard]] std::string ToString(const Version& version);
 
 /// JSON line used by `oyi --version --json`: {"engine":"0.1.0","protocol":0,"schemaHash":"0x..."}.
-/// `schemaHash` is the build's component schema (the tool combines the modules'); "0" when unknown.
-[[nodiscard]] std::string GetVersionJson(uint64_t schemaHash = 0);
+/// `schemaHash` is the build's component schema (the tool combines the modules'), "0" when
+/// unknown; `protocolVersion` is the wire protocol of oyi_rpc, 0 when the build has none.
+[[nodiscard]] std::string GetVersionJson(uint64_t schemaHash = 0, uint32_t protocolVersion = 0);
 
 /// Compile-time engine name for static assertions and compatibility checks.
 inline constexpr std::string_view kEngineName = "OyiEngine";
