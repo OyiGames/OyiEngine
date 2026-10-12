@@ -364,7 +364,7 @@ void Schedule::RunChunkTask(SystemRecord& record, const ChunkTask& task, core::A
 }
 
 void Schedule::RunChunkTasksJob(job::JobContext& context, void* data, uint32_t begin, uint32_t end) {
-    auto* const tasks = static_cast<ChunkTask*>(data);
+    const auto* const tasks = static_cast<const ChunkTask*>(data);
     for (uint32_t i = begin; i < end; ++i) {
         RunChunkTask(*tasks[i].mRecord, tasks[i], context.mFrameAllocator);
     }
