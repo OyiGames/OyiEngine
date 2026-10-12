@@ -32,6 +32,7 @@ struct JobContext {
     uint32_t mWorkerIndex;                 ///< 0..workerCount-1, or workerCount when the main thread helps
     core::FrameAllocator& mFrameAllocator; ///< scratch memory for this job's frame
     std::string_view mJobName;
+    CounterId mCompletion; ///< the counter this job accumulates into; a nested JobBuilder splices into it
 };
 
 /// Jobs are plain functions plus a data pointer: no std::function, no captures, nothing that needs
