@@ -123,6 +123,11 @@ public:
         mOutbox.Send(type, target, value);
     }
 
+    /// The same from `size` bytes already laid out as the message type (scripts, tools).
+    void SendBytes(MessageTypeIndex type, EntityId target, const void* data, uint32_t size) noexcept {
+        mOutbox.Send(type, target, data, size);
+    }
+
     [[nodiscard]] uint32_t GetPendingCommandCount() const noexcept { return mCommands.GetCommandCount(); }
 
 private:
