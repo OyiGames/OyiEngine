@@ -151,6 +151,24 @@ void Archetype::CopyRow(EntityLocation from, EntityLocation to) noexcept {
     GetEntities(to.mChunk)[to.mIndex] = GetEntities(from.mChunk)[from.mIndex];
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
+core::Result Archetype::RestoreChunk(std::span<const std::byte> data, uint32_t rows) noexcept {
+    if (data.size() != mLayout.GetChunkSize() || rows == 0 || rows > mLayout.GetCapacity()) {
+        return core::Fail(core::ErrorCode::InvalidArgument, "Archetype::RestoreChunk: not a chunk of this layout");
+    }
+    if (!mChunks.empty() && mChunks.back().mCount != mLayout.GetCapacity()) {
+        return core::Fail(core::ErrorCode::InvalidArgument, "Archetype::RestoreChunk: the previous chunk is not full");
+    }
+    if (!AllocateChunk(0)) {
+        return core::Fail(core::ErrorCode::OutOfMemory, "Archetype::RestoreChunk: cannot allocate a chunk");
+    }
+    Chunk& chunk = mChunks.back();
+    std::memcpy(chunk.mData, data.data(), data.size());
+    chunk.mCount = rows;
+    mEntityCount += rows;
+    return {};
+}
+
 core::Expected<EntityLocation> Archetype::Allocate(EntityId entity, uint32_t version) noexcept {
     const bool needChunk = mChunks.empty() || mChunks.back().mCount == mLayout.GetCapacity();
     if (needChunk && !AllocateChunk(version)) {

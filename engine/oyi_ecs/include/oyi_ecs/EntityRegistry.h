@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory_resource>
+#include <span>
 #include <vector>
 
 namespace oyi::ecs {
@@ -45,6 +46,17 @@ public:
     [[nodiscard]] uint32_t GetAliveCount() const noexcept { return mAliveCount; }
     /// Highest index ever handed out plus one; bounds any per-entity side table.
     [[nodiscard]] uint32_t GetCapacity() const noexcept { return static_cast<uint32_t>(mSlots.size()); }
+
+    // --- the slot table itself, for World::Save / Load (ADR-0013) ------------------------------
+
+    /// Generation of a slot (0 for an index never handed out) and whether it is alive now.
+    [[nodiscard]] uint32_t GetGeneration(uint32_t index) const noexcept;
+    [[nodiscard]] bool IsIndexAlive(uint32_t index) const noexcept;
+    /// Replaces the table: one generation and alive flag per index. Locations start empty; the
+    /// free list holds the dead indices with the lowest on top. Generations must not be zero.
+    void Restore(std::span<const uint32_t> generations, std::span<const uint8_t> alive) noexcept;
+    /// Forgets every entity and every index.
+    void Clear() noexcept;
 
 private:
     struct Slot {
