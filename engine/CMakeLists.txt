@@ -3,3 +3,4 @@
 add_subdirectory(oyi_core)
 add_subdirectory(oyi_job)
 add_subdirectory(oyi_ecs)
+add_subdirectory(oyi_transform)

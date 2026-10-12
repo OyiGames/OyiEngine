@@ -23,10 +23,11 @@ namespace oyi::ecs {
 
 namespace {
 
-/// The query needs everything the system touches, read or write.
+/// The query requires everything the system touches, read or write, except the optional types.
 [[nodiscard]] ComponentMask Touched(const SystemDesc& desc) noexcept {
     ComponentMask all = desc.mRead;
     desc.mWrite.ForEach([&all](ComponentTypeIndex type) { all.Set(type); });
+    desc.mOptional.ForEach([&all](ComponentTypeIndex type) { all.Clear(type); });
     return all;
 }
 

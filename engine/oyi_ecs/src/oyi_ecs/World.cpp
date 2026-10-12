@@ -177,7 +177,7 @@ const void* World::GetComponent(EntityId entity, ComponentTypeIndex type) const 
     return archetype.GetColumn(row.mChunk, *column) + (static_cast<size_t>(row.mIndex) * column->mElementSize);
 }
 
-void* World::GetComponentForWrite(EntityId entity, ComponentTypeIndex type) noexcept {
+void* World::GetComponentForWrite(EntityId entity, ComponentTypeIndex type, uint32_t version) noexcept {
     if (!mEntities.IsAlive(entity)) {
         return nullptr;
     }
@@ -187,7 +187,7 @@ void* World::GetComponentForWrite(EntityId entity, ComponentTypeIndex type) noex
     if (column == nullptr) {
         return nullptr;
     }
-    archetype.SetVersion(row.mChunk, column->mSlot, mVersion);
+    archetype.SetVersion(row.mChunk, column->mSlot, version);
     return archetype.GetColumn(row.mChunk, *column) + (static_cast<size_t>(row.mIndex) * column->mElementSize);
 }
 
