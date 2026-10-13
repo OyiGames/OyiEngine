@@ -4,8 +4,15 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdlib>
+#include <string_view>
 
-#ifdef _WIN32
+#ifndef OYI_USE_MIMALLOC
+#define OYI_USE_MIMALLOC 0
+#endif
+
+#if OYI_USE_MIMALLOC
+#include <mimalloc.h>
+#elifdef _WIN32
 #include <malloc.h> // IWYU pragma: keep
 #endif
 
@@ -13,10 +20,12 @@ namespace oyi::core {
 
 namespace {
 
-// The one place in the engine that talks to the platform heap; everything else goes through an
-// Allocator. mimalloc (ADR-0018) replaces these two functions.
+// The one place in the engine that talks to the heap; everything else goes through an Allocator.
+// mimalloc (ADR-0018) is the default heap; the C runtime stays for sanitizer builds and opt-outs.
 void* PlatformAlignedAlloc(size_t size, size_t alignment) noexcept {
-#ifdef _WIN32
+#if OYI_USE_MIMALLOC
+    return mi_malloc_aligned(size, alignment); // NOLINT(misc-include-cleaner)
+#elifdef _WIN32
     // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory, misc-include-cleaner)
     return _aligned_malloc(size, alignment);
 #else
@@ -29,7 +38,9 @@ void* PlatformAlignedAlloc(size_t size, size_t alignment) noexcept {
 }
 
 void PlatformAlignedFree(void* ptr) noexcept {
-#ifdef _WIN32
+#if OYI_USE_MIMALLOC
+    mi_free(ptr); // NOLINT(misc-include-cleaner)
+#elifdef _WIN32
     // NOLINTNEXTLINE(cppcoreguidelines-no-malloc, cppcoreguidelines-owning-memory, misc-include-cleaner)
     _aligned_free(ptr);
 #else
@@ -64,6 +75,14 @@ void SystemAllocator::Free(void* ptr, size_t size, size_t /*alignment*/) noexcep
 SystemAllocator::Stats SystemAllocator::GetStats() const noexcept {
     return Stats{.mLiveAllocations = mLiveAllocations.load(std::memory_order_relaxed),
                  .mLiveBytes       = mLiveBytes.load(std::memory_order_relaxed)};
+}
+
+std::string_view SystemAllocator::GetBackendName() noexcept {
+#if OYI_USE_MIMALLOC
+    return "mimalloc";
+#else
+    return "crt";
+#endif
 }
 
 SystemAllocator& GetSystemAllocator() noexcept {

@@ -2,6 +2,7 @@
 #include <oyi_core/Assert.h>
 #include <oyi_core/Expected.h>
 #include <oyi_core/FrameAllocator.h>
+#include <oyi_core/Profile.h>
 #include <oyi_core/SystemAllocator.h>
 #include <oyi_ecs/AccessLog.h>
 #include <oyi_ecs/Archetype.h>
@@ -387,6 +388,7 @@ void Schedule::RunSystem(SystemRecord& record, uint32_t version, core::Allocator
         record.mAccesses.Clear();
         return; // downclocked: this frame is not its turn
     }
+    OYI_ZONE_TEXT(record.mDesc.mName);
     SystemContext context(mWorld, record.mQuery, record.mCommands, record.mOutbox, record.mInbox, record.mDesc, version,
                           record.mLastVersion, scratch,
                           ChunkTaskDispatcher{.mFunction = &Schedule::DispatchChunkTasks, .mOwner = &record});

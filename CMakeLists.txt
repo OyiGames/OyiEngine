@@ -21,6 +21,8 @@ include(OyiCodegen)
 include(OyiModule)
 
 option(OYI_BUILD_TOOLS "Build the oyi command-line tools" ON)
+option(OYI_USE_MIMALLOC "Run SystemAllocator on mimalloc instead of the C runtime heap (ADR-0018)" ON)
+option(OYI_PROFILE "Compile Tracy zones, frame marks and thread names into the engine (ADR-0018)" OFF)
 
 add_subdirectory(engine)
 

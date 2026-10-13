@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <string_view>
 
 namespace oyi::core {
 
@@ -21,6 +22,9 @@ public:
 
     /// Outstanding allocations made through this instance; both are zero when nothing leaked.
     [[nodiscard]] Stats GetStats() const noexcept;
+
+    /// "mimalloc" or "crt": the heap this build runs on (ADR-0018).
+    [[nodiscard]] static std::string_view GetBackendName() noexcept;
 
 private:
     std::atomic<size_t> mLiveAllocations = 0;

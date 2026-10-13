@@ -50,7 +50,8 @@
       "displayName": "macOS arm64 + ASan/UBSan",
       "cacheVariables": {
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
-        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "OYI_USE_MIMALLOC": "OFF"
       }
     },
     {
