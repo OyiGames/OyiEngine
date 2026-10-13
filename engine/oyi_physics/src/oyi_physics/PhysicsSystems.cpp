@@ -60,8 +60,9 @@ void PushSystem(ecs::SystemContext& context) {
     });
 }
 
-/// Main thread: dead owners first, then the step itself.
-void StepSystem(ecs::SystemContext& context) {
+/// Main thread: dead owners first, then the step itself. The signature is SystemFunction's; the
+/// step only reads through its context.
+void StepSystem(ecs::SystemContext& context) { // NOLINT(misc-const-correctness)
     const auto* const state = context.GetData<PhysicsContext>();
     (void)state->mPhysics->CollectDead(context.GetWorld());
     const core::Result stepped = state->mPhysics->Step(context.GetEnvironment().mFixedStepSeconds);

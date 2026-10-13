@@ -79,7 +79,7 @@ void JoltJobSystem::FreeJob(Job* job) {
     mSlots.DestructObject(static_cast<Slot*>(job)); // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 }
 
-void JoltJobSystem::Dispatch(Slot* slot) noexcept {
+void JoltJobSystem::Dispatch(Slot* slot) {
     slot->AddRef(); // released by Run
     mDispatched.fetch_add(1, std::memory_order_relaxed);
     const job::JobDesc desc{
@@ -92,7 +92,7 @@ void JoltJobSystem::Dispatch(Slot* slot) noexcept {
     }
 }
 
-void JoltJobSystem::Run(job::JobContext& context, void* data) noexcept {
+void JoltJobSystem::Run(job::JobContext& context, void* data) {
     auto* const slot = static_cast<Slot*>(data);
     if (context.mWorkerIndex < slot->mOwner->mWorkerCount) {
         slot->mOwner->mOnWorkers.fetch_add(1, std::memory_order_relaxed);

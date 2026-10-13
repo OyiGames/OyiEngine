@@ -51,8 +51,9 @@ private:
         JoltJobSystem* mOwner;
     };
 
-    static void Run(job::JobContext& context, void* data) noexcept;
-    void Dispatch(Slot* slot) noexcept;
+    // Neither is noexcept: Jolt's job function is a std::function, which may throw on call.
+    static void Run(job::JobContext& context, void* data);
+    void Dispatch(Slot* slot);
 
     job::JobSystem& mJobs;
     uint32_t mWorkerCount;
