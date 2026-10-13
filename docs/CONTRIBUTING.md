@@ -54,9 +54,10 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
 - Milestones are tagged `vX.Y.Z` on `main`; a tag triggers the release workflow, which attaches
   the `oyi` tool for Windows x64 and macOS arm64 to the GitHub release.
 - Dependencies are added only through `vcpkg.json` and recorded in `docs/THIRD_PARTY.md`.
-- The wire protocol schema is the `OyiProtocol` submodule at `protocol/`, pinned to a tag whose
-  MAJOR is the protocol version: clone with `--recurse-submodules` or run
-  `git submodule update --init`. Protocol changes go to that repository first.
+- The wire protocol schema is the `OyiProtocol` submodule at `protocol/`, pinned to a tag
+  `v0.<protocol_version>.<patch>` (0.x: the MINOR number is the protocol version): clone with
+  `--recurse-submodules` or run `git submodule update --init`. Protocol changes go to that
+  repository first; a new protocol version means a new `kProtocolVersion` here.
 
 ## Tooling
 

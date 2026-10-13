@@ -1,7 +1,7 @@
 find_package(flatbuffers CONFIG REQUIRED)
 
-# The schema comes from the OyiProtocol submodule (protocol/, pinned to a tag whose MAJOR is the
-# protocol version) and becomes generated/include/oyi_rpc/oyi_protocol_generated.h (private: the
+# The schema comes from the OyiProtocol submodule (protocol/, pinned to a v0.<protocol_version>.<patch>
+# tag while the protocol is 0.x) and becomes generated/include/oyi_rpc/oyi_protocol_generated.h (private: the
 # public API of the module speaks plain C++, the wire format stays inside).
 set(_oyi_protocol_schema "${PROJECT_SOURCE_DIR}/protocol/schema/oyi_protocol.fbs")
 if(NOT EXISTS "${_oyi_protocol_schema}")

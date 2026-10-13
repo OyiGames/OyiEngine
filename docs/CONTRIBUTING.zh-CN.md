@@ -42,7 +42,7 @@ English: [CONTRIBUTING.md](CONTRIBUTING.md)
 - 不提交生成物与构建产物（`out/`、`generated/`）。
 - 里程碑在 `main` 上打 `vX.Y.Z` tag；tag 触发 release workflow，把 Windows x64 与 macOS arm64 的 `oyi` 工具附到 GitHub release。
 - 依赖只通过 `vcpkg.json` 引入，并登记到 `docs/THIRD_PARTY.md`。
-- 线上协议 schema 是 `protocol/` 下的 `OyiProtocol` 子模块，锁定在 MAJOR 等于协议版本的 tag：克隆时加 `--recurse-submodules`，或执行 `git submodule update --init`。改协议先去那个仓库。
+- 线上协议 schema 是 `protocol/` 下的 `OyiProtocol` 子模块，锁定在 `v0.<protocol_version>.<patch>` 形式的 tag（0.x 阶段 MINOR 就是协议版本）：克隆时加 `--recurse-submodules`，或执行 `git submodule update --init`。改协议先去那个仓库；协议版本加一时这边的 `kProtocolVersion` 要跟着改。
 
 ## 工具
 
