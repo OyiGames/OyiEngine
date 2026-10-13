@@ -47,8 +47,9 @@ using WorldKindMask = uint8_t;
 
 inline constexpr WorldKindMask kAllWorldKinds = 0xFFu;
 /// Presentation systems (ADR-0001): everything but the server.
-inline constexpr WorldKindMask kPresentationWorldKinds =
-    static_cast<WorldKindMask>(KindBit(WorldKind::Client) | KindBit(WorldKind::Editor) | KindBit(WorldKind::Baking));
+inline constexpr WorldKindMask kPresentationWorldKinds = static_cast<WorldKindMask>(
+    static_cast<unsigned>(KindBit(WorldKind::Client)) | static_cast<unsigned>(KindBit(WorldKind::Editor)) |
+    static_cast<unsigned>(KindBit(WorldKind::Baking)));
 
 class World {
 public:
