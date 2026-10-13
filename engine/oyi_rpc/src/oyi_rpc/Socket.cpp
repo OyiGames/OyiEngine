@@ -20,9 +20,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -159,7 +157,7 @@ core::Expected<TcpStream> TcpStream::Connect(std::string_view address, uint16_t 
     (void)ioctlsocket(socket, FIONBIO, &nonBlocking);
 #else
     const int flags = fcntl(socket, F_GETFL, 0);
-    (void)fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+    (void)fcntl(socket, F_SETFL, static_cast<int>(static_cast<unsigned>(flags) | static_cast<unsigned>(O_NONBLOCK)));
 #endif
     const int started = connect(socket, reinterpret_cast<const sockaddr*>(&target), sizeof(target));
     if (started != 0 && !WouldBlock()) {
