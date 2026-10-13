@@ -153,8 +153,11 @@ function(oyi_target_codegen target)
                 --depfile "${depfile}"
                 --libclang "${OYI_LIBCLANG}"
                 -- ${OYI_CODEGEN_CLANG_ARGS}
-                "-I$<JOIN:$<REMOVE_DUPLICATES:$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>>,;-I>"
-                "$<$<BOOL:$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>>:-D$<JOIN:$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>,;-D>>"
+                # Per-configuration entries (such as the Debug-only OYI_ACCESS_CHECKS) leave empty
+                # elements in the other configurations; drop them before prefixing, or libclang
+                # gets a bare -D / -I and fails to parse (seen on the macOS Release build).
+                "$<LIST:TRANSFORM,$<LIST:FILTER,$<REMOVE_DUPLICATES:$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>>,EXCLUDE,^$>,PREPEND,-I>"
+                "$<LIST:TRANSFORM,$<LIST:FILTER,$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>,EXCLUDE,^$>,PREPEND,-D>"
             WORKING_DIRECTORY "${OYI_CODEGEN_DIR}"
             DEPFILE "${depfile}"
             DEPENDS "${ARG_INCLUDE_ROOT}/${header}" ${OYI_CODEGEN_SOURCES}
