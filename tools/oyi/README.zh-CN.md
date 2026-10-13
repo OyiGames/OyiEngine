@@ -2,6 +2,8 @@
 
 English: [README.md](README.md)
 
+预编译二进制：每个 `v*` tag 发布一个 GitHub release，附 `oyi-<tag>-windows-x64.zip`（`oyi.exe`，需要 VC++ 运行库）和 `oyi-<tag>-macos-arm64.tar.gz`（`oyi`），各带 LICENSE；见 `.github/workflows/release.yml`。
+
 唯一的命令行入口（ADR-0016）。每个子命令都接受 `--json`（stdout 上一个 JSON 对象，失败为
 `{"error":{"code":..,"message":..}}`）与 `--quiet`。退出码：0 成功，1 命令执行了但失败，2 用法错误，3 内部错误。
 

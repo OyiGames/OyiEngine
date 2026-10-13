@@ -2,6 +2,10 @@
 
 中文版：[README.zh-CN.md](README.zh-CN.md)
 
+Prebuilt binaries: every `v*` tag publishes a GitHub release with `oyi-<tag>-windows-x64.zip`
+(`oyi.exe`, needs the VC++ runtime) and `oyi-<tag>-macos-arm64.tar.gz` (`oyi`), each with the
+LICENSE; see `.github/workflows/release.yml`.
+
 The single command-line entry point (ADR-0016). Every subcommand takes `--json` (one JSON object
 on stdout, failures as `{"error":{"code":..,"message":..}}`) and `--quiet`. Exit codes: 0 ok,
 1 the command ran and failed, 2 usage, 3 internal error.

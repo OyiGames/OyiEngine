@@ -1,0 +1,128 @@
+name: Release
+
+# Builds the oyi command-line tool for a tag and attaches it to the GitHub release:
+#   oyi-<tag>-windows-x64.zip      oyi.exe + LICENSE   (MSVC, dynamic CRT: needs the VC++ runtime)
+#   oyi-<tag>-macos-arm64.tar.gz   oyi + LICENSE       (Apple Clang, Apple silicon)
+# Consumers (the OyiEditor CI) download the asset for their platform and run `oyi serve --rpc`.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and (re)upload"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  VCPKG_COMMIT: e456309491fd875487bf02b8a0dca76c1b1b00cc
+
+jobs:
+  build:
+    name: oyi ${{ matrix.asset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, preset: windows-msvc, asset: windows-x64 }
+          - { os: macos-latest,   preset: macos,        asset: macos-arm64 }
+    steps:
+      - name: Resolve tag
+        shell: bash
+        run: echo "TAG=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          submodules: true
+
+      - name: MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install codegen dependencies
+        run: python -m pip install -r tools/codegen/requirements.txt
+
+      - name: vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          doNotCache: true
+
+      # Same files cache as the CI workflow, so a release build reuses what main already built.
+      - name: Binary cache (files + actions/cache)
+        shell: bash
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${{ runner.temp }}/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-${{ matrix.preset }}-${{ hashFiles('vcpkg.json') }}-${{ env.VCPKG_COMMIT }}
+          restore-keys: vcpkg-${{ matrix.preset }}-
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build oyi (Release)
+        run: cmake --build --preset ${{ matrix.preset }}-release --target oyi
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          exe=$(find out/build/${{ matrix.preset }}/tools/oyi/Release -maxdepth 1 -name 'oyi' -o -maxdepth 1 -name 'oyi.exe' | head -1)
+          echo "OYI_EXE=$exe" >> "$GITHUB_ENV"
+          "$exe" --version --json
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory stage | Out-Null
+          Copy-Item $env:OYI_EXE stage/oyi.exe
+          Copy-Item LICENSE stage/LICENSE
+          Compress-Archive -Path stage/* -DestinationPath "oyi-$env:TAG-${{ matrix.asset }}.zip"
+      - name: Package (tar.gz)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir stage
+          cp "$OYI_EXE" stage/oyi
+          cp LICENSE stage/LICENSE
+          tar -czf "oyi-$TAG-${{ matrix.asset }}.tar.gz" -C stage oyi LICENSE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oyi-${{ matrix.asset }}
+          path: oyi-${{ env.TAG }}-${{ matrix.asset }}.*
+          if-no-files-found: error
+
+  publish:
+    name: attach to release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        run: echo "TAG=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -l assets
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" assets/* --clobber
+          else
+            gh release create "$TAG" assets/* --verify-tag --generate-notes --title "$TAG"
+          fi
