@@ -3,6 +3,7 @@
 #include <oyi_core/Expected.h>
 #include <oyi_core/FrameAllocator.h>
 #include <oyi_core/Memory.h>
+#include <oyi_core/Profile.h>
 #include <oyi_core/SpinLock.h>
 #include <oyi_core/TaggedHeap.h>
 #include <oyi_job/Job.h>
@@ -354,7 +355,10 @@ void JobSystem::Execute(JobRecord* job, Worker& worker) noexcept {
                        .mCompletion     = job->mAccumulate};
     const JobContext* const previous = gCurrentContext;
     gCurrentContext                  = &context;
-    job->mDesc.mFunction(context, job->mDesc.mData);
+    {
+        OYI_ZONE_TEXT(job->mDesc.mName); // ADR-0009: the job name is the marker
+        job->mDesc.mFunction(context, job->mDesc.mData);
+    }
     gCurrentContext = previous;
     Complete(job);
 }
@@ -377,6 +381,7 @@ void JobSystem::WorkerMain(uint32_t workerIndex) noexcept {
         const auto [end, error]  = std::to_chars(name.data() + kPrefix, name.data() + name.size(), workerIndex);
         const size_t length      = error == std::errc{} ? static_cast<size_t>(end - name.data()) : kPrefix;
         platform::SetCurrentThreadName(std::string_view(name.data(), length));
+        OYI_THREAD_NAME(std::string_view(name.data(), length));
     }
     Worker& worker = mWorkers[workerIndex];
     while (true) {
@@ -438,6 +443,7 @@ bool JobSystem::IsInJob() noexcept {
 // --- frame memory -----------------------------------------------------------------------------
 
 void JobSystem::BeginFrame(core::MemoryTag tag) noexcept {
+    OYI_FRAME_MARK;
     OYI_CHECK(mInFlight.load(std::memory_order_acquire) == 0, "BeginFrame with jobs in flight");
     const uint32_t workerSlots = mConfig.mWorkerCount + 1;
     for (uint32_t i = 0; i < workerSlots; ++i) {

@@ -1,7 +1,10 @@
+find_package(glm CONFIG REQUIRED)
+
 oyi_add_module(transform
     PUBLIC_HEADERS
         include/oyi_transform/Affine.h
         include/oyi_transform/Components.h
+        include/oyi_transform/Glm.h
         include/oyi_transform/PresentationSystems.h
         include/oyi_transform/TransformSystems.h
         include/oyi_transform/UsdConventions.h
@@ -12,5 +15,5 @@ oyi_add_module(transform
         src/oyi_transform/PresentationSystems.cpp
         src/oyi_transform/TransformSystems.cpp
         src/oyi_transform/UsdConventions.cpp
-    DEPS oyi::ecs oyi::core
+    DEPS oyi::ecs oyi::core glm::glm-header-only
 )

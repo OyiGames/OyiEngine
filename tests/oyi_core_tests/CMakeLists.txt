@@ -6,6 +6,7 @@ oyi_add_test(oyi_core_tests
         LinearAllocatorTests.cpp
         MemoryResourceTests.cpp
         MemoryTests.cpp
+        ProfileTests.cpp
         SpinLockTests.cpp
         SystemAllocatorTests.cpp
         TaggedHeapTests.cpp
@@ -13,3 +14,4 @@ oyi_add_test(oyi_core_tests
         VersionTests.cpp
     DEPS oyi::core
 )
+target_compile_definitions(oyi_core_tests PRIVATE "OYI_EXPECT_MIMALLOC=$<BOOL:${OYI_USE_MIMALLOC}>")

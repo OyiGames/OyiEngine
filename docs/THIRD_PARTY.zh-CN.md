@@ -8,9 +8,9 @@ English: [THIRD_PARTY.md](THIRD_PARTY.md)
 |---|---|---|---|---|
 | Catch2 | vcpkg | BSL-1.0 | 单元测试 | 使用中 |
 | Jolt Physics | vcpkg | MIT | 物理 | 计划 |
-| Tracy | vcpkg | BSD-3-Clause | Profiler | 计划 |
-| mimalloc | vcpkg | MIT | 全局分配器 | 计划 |
-| GLM | vcpkg | MIT | 标量数学 | 计划 |
+| Tracy | vcpkg（0.14.1） | BSD-3-Clause | `OYI_PROFILE` 下的 profiler zone（`oyi_core/Profile.h`） | 使用中 |
+| mimalloc | vcpkg（3.5.3） | MIT | `SystemAllocator` 的堆（`OYI_USE_MIMALLOC`，默认开） | 使用中 |
+| GLM | vcpkg（1.0.3） | MIT | gameplay 与工具的标量数学（`oyi_transform/Glm.h`） | 使用中 |
 | Google Highway | vcpkg | Apache-2.0 | 批量 SIMD | 计划 |
 | FlatBuffers | vcpkg（25.12.19） | Apache-2.0 | 线上协议（`oyi_rpc`）、描述类资产 | 使用中 |
 | Luau | vcpkg（0.741） | MIT | 脚本（`oyi_script`） | 使用中 |

@@ -26,7 +26,9 @@ using oyi::ecs::World;
 using oyi::script::ScriptModuleId;
 using oyi::script::ScriptVm;
 
-constexpr ScriptVm::Config kSmall{.mMemoryLimit = size_t{1024} * 1024, .mCallBudgetMicroseconds = 20000};
+// A generous call budget: the memory-limit test must run out of memory, not of time, on a loaded
+// machine with a debug allocator. The time-budget test brings its own tight budget.
+constexpr ScriptVm::Config kSmall{.mMemoryLimit = size_t{1024} * 1024, .mCallBudgetMicroseconds = 2000000};
 
 /// A window opened by hand: these tests need no schedule.
 struct Fixture {
@@ -62,6 +64,7 @@ TEST_CASE("a VM takes its memory from the allocator under a limit and gives it a
         const auto failed           = vm.Call(f.mWindow, module, "fill");
         REQUIRE_FALSE(failed.has_value());
         CHECK(failed.error().mCode == ErrorCode::InvalidState);
+        CAPTURE(vm.GetLastError());
         CHECK(Contains(vm.GetLastError(), "not enough memory"));
         CHECK(vm.GetStats().mUsedBytes <= kSmall.mMemoryLimit);
         CHECK(vm.GetStats().mPeakBytes <= kSmall.mMemoryLimit);
