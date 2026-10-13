@@ -1,6 +1,6 @@
 Invalid.h:17:23: error: [OYI-C001] annotated declaration must be a 'struct' at namespace scope
 Invalid.h:22:1: error: [OYI-C006] 5 byte(s) of implicit tail padding in 'BadOptions'; add 'std::uint8_t mPad[5] = {};' as the last field
-Invalid.h:22:30: error: [OYI-C012] unknown option 'Flying'; allowed: ['Chunk', 'Replicated', 'Tag']
+Invalid.h:22:30: error: [OYI-C012] unknown option 'Flying'; allowed: ['Chunk', 'Predicted', 'Replicated', 'Tag']
 Invalid.h:22:43: error: [OYI-C002] base classes are not allowed
 Invalid.h:23:20: error: [OYI-C004] field 'mPlainInt' has type 'int'; use a fixed-width integer (std::int32_t, std::uint8_t, ...)
 Invalid.h:24:20: error: [OYI-C004] field 'mPointer' has type 'std::uint64_t *' which is not allowed; components store handles (oyi::core::Handle<Tag>), never pointers or references

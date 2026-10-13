@@ -224,7 +224,7 @@ TEST_CASE("loading refuses the wrong world, the wrong schema and damaged files",
         CHECK(other.Load(bytes).error().mCode == ErrorCode::CorruptData);
     }
     SECTION("another chunk size") {
-        World other(allocator, World::Config{.mChunkSize = 32 * 1024});
+        World other(allocator, World::Config{.mChunkSize = 32 * 1024, .mKind = oyi::ecs::WorldKind::Client});
         (void)RegisterAll(other);
         CHECK(other.Load(bytes).error().mCode == ErrorCode::CorruptData);
     }

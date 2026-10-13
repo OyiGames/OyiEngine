@@ -8,7 +8,8 @@
 //       OYI_FIELD(Quantize = 0.01) float mX = 0.0f;
 //   };
 //
-// Component options: Tag (no data), Replicated (fields are synchronized), Chunk (one per chunk).
+// Component options: Tag (no data), Replicated (fields are synchronized), Chunk (one per chunk),
+//                    Predicted (takes part in client prediction, ADR-0017).
 // Field options:     Replicated, Hidden (not shown in inspectors), Quantize = <step>.
 // OYI_STRUCT marks a plain value type (for example a vector) that components may embed.
 
