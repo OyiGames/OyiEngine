@@ -38,6 +38,10 @@ void PrintFailure(const Options& options, std::string_view code, std::string_vie
 [[nodiscard]] bool ReadFile(std::string_view path, std::vector<std::byte>& out, std::string& error);
 
 int RunVersion(std::span<const std::string_view> args);
+
+/// The schema hash of this build: every engine module that declares components, in dependency
+/// order (what `--version --json` prints and what the RPC Welcome carries).
+[[nodiscard]] unsigned long long GetBuildSchemaHash() noexcept;
 int RunWorld(std::span<const std::string_view> args);
 int RunAsset(std::span<const std::string_view> args);
 int RunSchema(std::span<const std::string_view> args);

@@ -8,7 +8,7 @@ same pull request. NOTICE files of Apache-2.0 components ship with release packa
 | Name | Source | License | Purpose | Status |
 |---|---|---|---|---|
 | Catch2 | vcpkg | BSL-1.0 | Unit tests | In use |
-| Jolt Physics | vcpkg | MIT | Physics | Planned |
+| Jolt Physics | vcpkg (5.6.0) | MIT | Rigid bodies behind `oyi_physics` (`PhysicsWorld`, push / step / pull systems); Jolt's jobs run on the engine JobSystem | In use |
 | Tracy | vcpkg (0.14.1) | BSD-3-Clause | Profiler zones behind `OYI_PROFILE` (`oyi_core/Profile.h`) | In use |
 | mimalloc | vcpkg (3.5.3) | MIT | `SystemAllocator` heap (`OYI_USE_MIMALLOC`, default on) | In use |
 | GLM | vcpkg (1.0.3) | MIT | Scalar math for gameplay and tools (`oyi_transform/Glm.h`) | In use |

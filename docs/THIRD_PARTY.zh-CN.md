@@ -7,7 +7,7 @@ English: [THIRD_PARTY.md](THIRD_PARTY.md)
 | 名称 | 来源 | 许可 | 用途 | 状态 |
 |---|---|---|---|---|
 | Catch2 | vcpkg | BSL-1.0 | 单元测试 | 使用中 |
-| Jolt Physics | vcpkg | MIT | 物理 | 计划 |
+| Jolt Physics | vcpkg（5.6.0） | MIT | `oyi_physics` 里的刚体（`PhysicsWorld`、push / step / pull system）；Jolt 的 job 跑在引擎 JobSystem 上 | 使用中 |
 | Tracy | vcpkg（0.14.1） | BSD-3-Clause | `OYI_PROFILE` 下的 profiler zone（`oyi_core/Profile.h`） | 使用中 |
 | mimalloc | vcpkg（3.5.3） | MIT | `SystemAllocator` 的堆（`OYI_USE_MIMALLOC`，默认开） | 使用中 |
 | GLM | vcpkg（1.0.3） | MIT | gameplay 与工具的标量数学（`oyi_transform/Glm.h`） | 使用中 |
