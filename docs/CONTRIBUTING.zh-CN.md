@@ -41,6 +41,7 @@ English: [CONTRIBUTING.md](CONTRIBUTING.md)
 - 一个 PR 一个主题；填写模板。
 - 不提交生成物与构建产物（`out/`、`generated/`）。
 - 依赖只通过 `vcpkg.json` 引入，并登记到 `docs/THIRD_PARTY.md`。
+- 线上协议 schema 是 `protocol/` 下的 `OyiProtocol` 子模块，锁定在 MAJOR 等于协议版本的 tag：克隆时加 `--recurse-submodules`，或执行 `git submodule update --init`。改协议先去那个仓库。
 
 ## 工具
 
