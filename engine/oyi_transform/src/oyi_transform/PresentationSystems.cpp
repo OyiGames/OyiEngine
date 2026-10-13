@@ -56,8 +56,9 @@ void InterpolateSystem(ecs::SystemContext& context) {
     });
 }
 
-/// One task per chunk: the chunk's WorldBounds from its translations.
-void BoundsTask(ecs::SystemContext& task, ecs::ChunkView& view) {
+/// One task per chunk: the chunk's WorldBounds from its translations. The signature is
+/// ChunkTaskFunction's; this task only reads through its context.
+void BoundsTask(ecs::SystemContext& task, ecs::ChunkView& view) { // NOLINT(misc-const-correctness)
     const auto* const state                   = task.GetData<PresentationContext>();
     const std::span<const LocalToWorld> world = task.Read<LocalToWorld>(view, state->mTypes.mLocalToWorld);
     auto* const bounds = static_cast<WorldBounds*>(view.GetChunkComponentForWrite(state->mTypes.mWorldBounds));
