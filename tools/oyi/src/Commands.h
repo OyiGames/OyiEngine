@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace oyi::cli {
@@ -22,9 +23,11 @@ struct Options {
     bool mJson  = false;
     bool mQuiet = false;
     std::vector<std::string_view> mPositional;
+    /// Every other `--name` or `--name=value`; each command decides which it accepts.
+    std::vector<std::pair<std::string_view, std::string_view>> mNamed;
 };
 
-/// Splits --json / --quiet from the positional arguments; false on an unknown switch.
+/// Splits --json / --quiet and the named switches from the positional arguments.
 [[nodiscard]] bool ParseOptions(std::span<const std::string_view> args, Options& out);
 
 /// JSON helpers: a quoted, escaped string and a failure line {"error":{"code":..,"message":..}}.
@@ -38,5 +41,6 @@ int RunVersion(std::span<const std::string_view> args);
 int RunWorld(std::span<const std::string_view> args);
 int RunAsset(std::span<const std::string_view> args);
 int RunSchema(std::span<const std::string_view> args);
+int RunServe(std::span<const std::string_view> args);
 
 } // namespace oyi::cli

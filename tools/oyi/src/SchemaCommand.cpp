@@ -45,7 +45,8 @@ namespace {
 
 int RunSchema(std::span<const std::string_view> args) {
     Options options;
-    if (!ParseOptions(args, options) || options.mPositional.size() != 2 || options.mPositional[0] != "validate") {
+    if (!ParseOptions(args, options) || !options.mNamed.empty() || options.mPositional.size() != 2 ||
+        options.mPositional[0] != "validate") {
         std::fputs("usage: oyi schema validate <header.h> [--json]\n", stdout);
         return kExitUsage;
     }

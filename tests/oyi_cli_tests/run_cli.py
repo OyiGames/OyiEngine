@@ -41,6 +41,7 @@ def main(argv: list[str]) -> int:
     try:
         doc = json.loads(result.stdout)
         fields_ok = set(doc) == {"engine", "protocol", "schemaHash"} and doc["schemaHash"] != "0"
+        fields_ok = fields_ok and doc["protocol"] >= 1
         expect("version json fields", fields_ok, result.stdout)
     except json.JSONDecodeError:
         expect("version json parse", False, result.stdout)
@@ -50,6 +51,8 @@ def main(argv: list[str]) -> int:
     expect("unknown command is usage", run(args.oyi, "frobnicate").returncode == 2)
     expect("world without file is usage", run(args.oyi, "world", "inspect").returncode == 2)
     expect("unknown switch is usage", run(args.oyi, "--version", "--verbose").returncode == 2)
+    expect("serve without --rpc is usage", run(args.oyi, "serve").returncode == 2)
+    expect("serve with a bad port is usage", run(args.oyi, "serve", "--rpc", "--port=abc").returncode == 2)
 
     # inspect on missing and damaged files: exit 1 with a JSON error line
     missing = os.path.join(args.work, "missing.oyiw")

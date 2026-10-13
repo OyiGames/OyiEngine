@@ -13,7 +13,7 @@ same pull request. NOTICE files of Apache-2.0 components ship with release packa
 | mimalloc | vcpkg | MIT | Global allocator | Planned |
 | GLM | vcpkg | MIT | Scalar math | Planned |
 | Google Highway | vcpkg | Apache-2.0 | Batch SIMD | Planned |
-| FlatBuffers | vcpkg | Apache-2.0 | Serialization / protocol | Planned |
+| FlatBuffers | vcpkg (25.12.19) | Apache-2.0 | Wire protocol (`oyi_rpc`), descriptive assets | In use |
 | Luau | vcpkg (0.741) | MIT | Scripting (`oyi_script`) | In use |
 | Dear ImGui / ImPlot | vcpkg | MIT | Tool UI | Planned |
 | Google Benchmark | vcpkg | Apache-2.0 | Benchmarks | Planned |

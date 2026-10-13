@@ -14,7 +14,8 @@ void PrintUsage() {
     std::fputs("usage: oyi --version [--json]\n"
                "       oyi world  inspect <file.oyiw> [--json]\n"
                "       oyi asset  inspect <file.oyib> [--json]\n"
-               "       oyi schema validate <header.h> [--json]\n",
+               "       oyi schema validate <header.h> [--json]\n"
+               "       oyi serve  --rpc [--port=N] [--once] [--json]\n",
                stdout);
 }
 
@@ -36,6 +37,9 @@ int Run(std::span<const std::string_view> args) {
     }
     if (command == "schema") {
         return oyi::cli::RunSchema(rest);
+    }
+    if (command == "serve") {
+        return oyi::cli::RunServe(rest);
     }
     PrintUsage();
     return oyi::cli::kExitUsage;

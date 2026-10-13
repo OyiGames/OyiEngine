@@ -1,0 +1,63 @@
+// The engine's wire protocol (ADR-0015): one TCP connection, length-prefixed FlatBuffers frames,
+// two channels. Meant to move to the OyiProtocol repository (consumed by the engine and the
+// editor as a submodule) once the editor repository exists; until then it lives here.
+//
+// Framing: every frame is a 32-bit little-endian byte count followed by one Envelope buffer with
+// the file identifier "OYIP". The command channel is request/response and ordered; the stream
+// channel carries snapshots, logs and profiler samples and may drop frames.
+
+namespace oyi.protocol;
+
+enum Channel : ubyte {
+    Command = 0,
+    Stream = 1,
+}
+
+/// First frame from the client. Loopback peers may leave auth empty; everyone else sends the
+/// one-time pairing token the device displayed (development builds only).
+table Hello {
+    protocol_version: uint32;
+    capabilities: uint64;
+    auth: string;
+    client_name: string;
+}
+
+/// The server's answer to a Hello it accepts.
+table Welcome {
+    protocol_version: uint32;
+    capabilities: uint64;
+    engine_version: string;
+    schema_hash: uint64;
+    session_id: uint32;
+}
+
+table Request {
+    id: uint32;
+    command: string (required);
+    args: [string];
+    payload: [ubyte];
+}
+
+table Response {
+    id: uint32;
+    ok: bool;
+    error_code: string;
+    message: string;
+    payload: [ubyte];
+}
+
+table StreamFrame {
+    stream: string (required);
+    sequence: uint64;
+    payload: [ubyte];
+}
+
+union Message { Hello, Welcome, Request, Response, StreamFrame }
+
+table Envelope {
+    channel: Channel;
+    message: Message;
+}
+
+root_type Envelope;
+file_identifier "OYIP";

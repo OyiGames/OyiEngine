@@ -1,4 +1,5 @@
 #include <oyi_core/Version.h>
+#include <oyi_rpc/Rpc.h>
 #include <oyi_transform/Components.gen.h> // IWYU pragma: keep
 
 #include <Commands.h>
@@ -24,7 +25,10 @@ bool ParseOptions(std::span<const std::string_view> args, Options& out) {
         } else if (arg == "--quiet") {
             out.mQuiet = true;
         } else if (arg.starts_with("--")) {
-            return false;
+            const std::string_view named = arg.substr(2);
+            const size_t equals          = named.find('=');
+            out.mNamed.emplace_back(named.substr(0, equals),
+                                    equals == std::string_view::npos ? std::string_view{} : named.substr(equals + 1));
         } else {
             out.mPositional.push_back(arg);
         }
@@ -92,15 +96,16 @@ bool ReadFile(std::string_view path, std::vector<std::byte>& out, std::string& e
 
 int RunVersion(std::span<const std::string_view> args) {
     Options options;
-    if (!ParseOptions(args, options) || !options.mPositional.empty()) {
+    if (!ParseOptions(args, options) || !options.mPositional.empty() || !options.mNamed.empty()) {
         std::fputs("usage: oyi --version [--json]\n", stdout);
         return kExitUsage;
     }
     // The schema hash of this build: every engine module that declares components, in order.
     const uint64_t schemaHash = oyi::transform::kSchemaHash;
     const std::string text =
-        options.mJson ? core::GetVersionJson(schemaHash)
-                      : std::format("{} (schema {:#018x})", core::ToString(core::GetEngineVersion()), schemaHash);
+        options.mJson ? core::GetVersionJson(schemaHash, rpc::kProtocolVersion)
+                      : std::format("{} (schema {:#018x}, protocol {})", core::ToString(core::GetEngineVersion()),
+                                    schemaHash, rpc::kProtocolVersion);
     std::fputs(text.c_str(), stdout);
     std::fputc('\n', stdout);
     return kExitOk;

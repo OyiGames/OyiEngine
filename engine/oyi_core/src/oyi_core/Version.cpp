@@ -14,14 +14,13 @@ std::string ToString(const Version& version) {
     return std::format("{}.{}.{}", version.mMajor, version.mMinor, version.mPatch);
 }
 
-std::string GetVersionJson(uint64_t schemaHash) {
-    // The protocol version is wired in once the protocol module exists; the field is emitted now
-    // so that clients never have to change their parser.
+std::string GetVersionJson(uint64_t schemaHash, uint32_t protocolVersion) {
     if (schemaHash == 0) {
-        return std::format(R"({{"engine":"{}","protocol":0,"schemaHash":"0"}})", ToString(GetEngineVersion()));
+        return std::format(R"({{"engine":"{}","protocol":{},"schemaHash":"0"}})", ToString(GetEngineVersion()),
+                           protocolVersion);
     }
-    return std::format(R"({{"engine":"{}","protocol":0,"schemaHash":"{:#018x}"}})", ToString(GetEngineVersion()),
-                       schemaHash);
+    return std::format(R"({{"engine":"{}","protocol":{},"schemaHash":"{:#018x}"}})", ToString(GetEngineVersion()),
+                       protocolVersion, schemaHash);
 }
 
 } // namespace oyi::core

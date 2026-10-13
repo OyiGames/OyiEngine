@@ -15,7 +15,8 @@ namespace oyi::cli {
 
 int RunAsset(std::span<const std::string_view> args) {
     Options options;
-    if (!ParseOptions(args, options) || options.mPositional.size() != 2 || options.mPositional[0] != "inspect") {
+    if (!ParseOptions(args, options) || !options.mNamed.empty() || options.mPositional.size() != 2 ||
+        options.mPositional[0] != "inspect") {
         std::fputs("usage: oyi asset inspect <file.oyib> [--json]\n", stdout);
         return kExitUsage;
     }
