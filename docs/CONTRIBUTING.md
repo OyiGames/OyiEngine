@@ -51,6 +51,8 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
   body wrapped at 72 columns. Commits authored with an AI assistant carry a `Co-Authored-By` trailer.
 - One topic per pull request; fill in the template.
 - Never commit generated files or build output (`out/`, `generated/`).
+- Milestones are tagged `vX.Y.Z` on `main`; a tag triggers the release workflow, which attaches
+  the `oyi` tool for Windows x64 and macOS arm64 to the GitHub release.
 - Dependencies are added only through `vcpkg.json` and recorded in `docs/THIRD_PARTY.md`.
 - The wire protocol schema is the `OyiProtocol` submodule at `protocol/`, pinned to a tag whose
   MAJOR is the protocol version: clone with `--recurse-submodules` or run
