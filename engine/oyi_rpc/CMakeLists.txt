@@ -1,8 +1,13 @@
 find_package(flatbuffers CONFIG REQUIRED)
 
-# protocol/oyi_protocol.fbs -> generated/include/oyi_rpc/oyi_protocol_generated.h (private: the
+# The schema comes from the OyiProtocol submodule (protocol/, pinned to a tag whose MAJOR is the
+# protocol version) and becomes generated/include/oyi_rpc/oyi_protocol_generated.h (private: the
 # public API of the module speaks plain C++, the wire format stays inside).
-set(_oyi_protocol_schema "${PROJECT_SOURCE_DIR}/protocol/oyi_protocol.fbs")
+set(_oyi_protocol_schema "${PROJECT_SOURCE_DIR}/protocol/schema/oyi_protocol.fbs")
+if(NOT EXISTS "${_oyi_protocol_schema}")
+    message(FATAL_ERROR
+        "OyiProtocol submodule is missing (${_oyi_protocol_schema}); run `git submodule update --init`")
+endif()
 set(_oyi_protocol_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/include/oyi_rpc")
 set(_oyi_protocol_header "${_oyi_protocol_dir}/oyi_protocol_generated.h")
 add_custom_command(

@@ -52,6 +52,9 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
 - One topic per pull request; fill in the template.
 - Never commit generated files or build output (`out/`, `generated/`).
 - Dependencies are added only through `vcpkg.json` and recorded in `docs/THIRD_PARTY.md`.
+- The wire protocol schema is the `OyiProtocol` submodule at `protocol/`, pinned to a tag whose
+  MAJOR is the protocol version: clone with `--recurse-submodules` or run
+  `git submodule update --init`. Protocol changes go to that repository first.
 
 ## Tooling
 
