@@ -9,6 +9,7 @@
     "catch2",
     "flatbuffers",
     "glm",
+    "joltphysics",
     "luau",
     "mimalloc",
     "tracy"

@@ -1,4 +1,5 @@
 #include <oyi_core/Version.h>
+#include <oyi_physics/Components.gen.h> // IWYU pragma: keep
 #include <oyi_rpc/Rpc.h>
 #include <oyi_transform/Components.gen.h> // IWYU pragma: keep
 
@@ -9,6 +10,7 @@
 #include <cstdio>
 #include <format>
 #include <fstream>
+#include <initializer_list>
 #include <ios>
 #include <iterator>
 #include <span>
@@ -94,14 +96,22 @@ bool ReadFile(std::string_view path, std::vector<std::byte>& out, std::string& e
     return true;
 }
 
+unsigned long long GetBuildSchemaHash() noexcept {
+    // Boost-style combination: the order of the modules is part of the hash.
+    unsigned long long hash = 0;
+    for (const unsigned long long part : {oyi::transform::kSchemaHash, oyi::physics::kSchemaHash}) {
+        hash ^= part + 0x9E37'79B9'7F4A'7C15ull + (hash << 6u) + (hash >> 2u);
+    }
+    return hash;
+}
+
 int RunVersion(std::span<const std::string_view> args) {
     Options options;
     if (!ParseOptions(args, options) || !options.mPositional.empty() || !options.mNamed.empty()) {
         std::fputs("usage: oyi --version [--json]\n", stdout);
         return kExitUsage;
     }
-    // The schema hash of this build: every engine module that declares components, in order.
-    const uint64_t schemaHash = oyi::transform::kSchemaHash;
+    const uint64_t schemaHash = GetBuildSchemaHash();
     const std::string text =
         options.mJson ? core::GetVersionJson(schemaHash, rpc::kProtocolVersion)
                       : std::format("{} (schema {:#018x}, protocol {})", core::ToString(core::GetEngineVersion()),

@@ -5,7 +5,6 @@
 #include <oyi_core/SystemAllocator.h>
 #include <oyi_core/Version.h>
 #include <oyi_rpc/Rpc.h>
-#include <oyi_transform/Components.gen.h> // IWYU pragma: keep
 
 #include <Commands.h>
 
@@ -29,7 +28,7 @@ void BuiltIn(void* /*data*/, const rpc::Request& request, rpc::Reply& reply) {
         return;
     }
     if (request.mCommand == "version") {
-        const std::string json = core::GetVersionJson(oyi::transform::kSchemaHash, rpc::kProtocolVersion);
+        const std::string json = core::GetVersionJson(GetBuildSchemaHash(), rpc::kProtocolVersion);
         reply.mPayload.assign(
             reinterpret_cast<const std::byte*>(json.data()), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
             reinterpret_cast<const std::byte*>(json.data()) +
@@ -70,12 +69,12 @@ int RunServe(std::span<const std::string_view> args) {
     }
     core::SystemAllocator allocator;
     const std::string engineVersion = core::ToString(core::GetEngineVersion());
-    rpc::RpcServer server(allocator, rpc::RpcServer::Config{.mPort          = port,
-                                                            .mLoopbackOnly  = true,
-                                                            .mAuthToken     = {},
-                                                            .mCapabilities  = 0,
-                                                            .mSchemaHash    = oyi::transform::kSchemaHash,
-                                                            .mEngineVersion = engineVersion,
+    rpc::RpcServer server(allocator, rpc::RpcServer::Config{.mPort                         = port,
+                                                            .mLoopbackOnly                 = true,
+                                                            .mAuthToken                    = {},
+                                                            .mCapabilities                 = 0,
+                                                            .mSchemaHash                   = GetBuildSchemaHash(),
+                                                            .mEngineVersion                = engineVersion,
                                                             .mHandshakeTimeoutMilliseconds = 5000});
     server.SetHandler(&BuiltIn, nullptr);
     const core::Result started = server.Start();
