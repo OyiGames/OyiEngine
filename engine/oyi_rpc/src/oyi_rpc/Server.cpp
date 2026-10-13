@@ -107,17 +107,21 @@ core::Result RpcServer::Handshake() noexcept {
     const protocol::Hello* const hello = envelope != nullptr && envelope->message_type() == protocol::Message::Hello
                                              ? envelope->message_as_Hello()
                                              : nullptr;
-    mReader.PopFrame();
-    flatbuffers::FlatBufferBuilder builder;
     if (hello == nullptr) {
+        mReader.PopFrame();
         return core::Fail(core::ErrorCode::CorruptData, "RpcServer: the first frame is not a Hello");
     }
+    // Everything the handshake needs is copied before the frame leaves the buffer: PopFrame shifts it.
+    const uint32_t clientVersion = hello->protocol_version();
+    const std::string clientAuth(View(hello->auth()));
+    mReader.PopFrame();
+    flatbuffers::FlatBufferBuilder builder;
     const char* refusal = nullptr;
     const char* code    = nullptr;
-    if (hello->protocol_version() != kProtocolVersion) {
+    if (clientVersion != kProtocolVersion) {
         refusal = "protocol version differs";
         code    = "Unsupported";
-    } else if (!mClient.IsLoopbackPeer() && (mConfig.mAuthToken.empty() || View(hello->auth()) != mConfig.mAuthToken)) {
+    } else if (!mClient.IsLoopbackPeer() && (mConfig.mAuthToken.empty() || clientAuth != mConfig.mAuthToken)) {
         refusal = "a pairing token is required from this peer";
         code    = "InvalidArgument";
     }
