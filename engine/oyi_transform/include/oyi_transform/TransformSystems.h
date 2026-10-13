@@ -26,6 +26,8 @@ struct TransformTypes {
     ecs::ComponentTypeIndex mParent;
     ecs::ComponentTypeIndex mPreviousParent;
     ecs::ComponentTypeIndex mManualTransform;
+    ecs::ComponentTypeIndex mRenderTransform;
+    ecs::ComponentTypeIndex mWorldBounds;
 };
 
 /// Registers every transform component with `world`.

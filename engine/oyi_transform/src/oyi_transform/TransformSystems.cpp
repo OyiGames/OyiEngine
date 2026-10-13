@@ -101,7 +101,9 @@ core::Expected<TransformTypes> RegisterTransformComponents(ecs::World& world) no
         !take(registry.Register<LocalToParent>(), types.mLocalToParent) ||
         !take(registry.Register<Parent>(), types.mParent) ||
         !take(registry.Register<PreviousParent>(), types.mPreviousParent) ||
-        !take(registry.Register<ManualTransform>(), types.mManualTransform)) {
+        !take(registry.Register<ManualTransform>(), types.mManualTransform) ||
+        !take(registry.Register<RenderTransform>(), types.mRenderTransform) ||
+        !take(registry.Register<WorldBounds>(), types.mWorldBounds)) {
         return core::Fail(core::ErrorCode::OutOfRange, "transform: component registry full");
     }
     return types;

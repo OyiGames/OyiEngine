@@ -75,6 +75,14 @@ public:
                                                      WorldKindMask kinds = kAllWorldKinds) noexcept;
     /// False for a system Build left out because of its kinds.
     [[nodiscard]] bool IsSystemIncluded(SystemId system) const noexcept;
+
+    /// Runs the system every `divisor`th frame (ADR-0007: presentation systems may be downclocked
+    /// per device profile). Only systems of the Presentation and End phases qualify; anything
+    /// earlier affects the simulation and fails with InvalidArgument, as does a divisor of zero.
+    /// A skipped run keeps its change-filter version and its inbox, so the next run sees
+    /// everything that happened meanwhile. May be changed after Build.
+    [[nodiscard]] core::Result SetRateDivisor(SystemId system, uint32_t divisor) noexcept;
+    [[nodiscard]] uint32_t GetRateDivisor(SystemId system) const noexcept;
     /// `before` runs to completion before `after` starts. Both must be in the same phase.
     [[nodiscard]] core::Result AddOrder(SystemId before, SystemId after) noexcept;
     /// Derives the per-phase order. Fails with InvalidState on an unordered conflict pair (see
