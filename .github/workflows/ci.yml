@@ -67,6 +67,8 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          # The repository's own vcpkg/ holds overlay ports; keep the vcpkg clone out of the tree.
+          vcpkgDirectory: ${{ runner.temp }}/vcpkg
           doNotCache: true
 
       # Binary cache (ADR-0020): Windows uses NuGet + GitHub Packages when the secret exists,
@@ -122,6 +124,8 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          # The repository's own vcpkg/ holds overlay ports; keep the vcpkg clone out of the tree.
+          vcpkgDirectory: ${{ runner.temp }}/vcpkg
           doNotCache: true
       - name: Binary cache (files)
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${{ runner.temp }}/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
