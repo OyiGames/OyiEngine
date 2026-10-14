@@ -57,6 +57,8 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          # The repository's own vcpkg/ holds overlay ports; keep the vcpkg clone out of the tree.
+          vcpkgDirectory: ${{ runner.temp }}/vcpkg
           doNotCache: true
 
       # Same files cache as the CI workflow, so a release build reuses what main already built.

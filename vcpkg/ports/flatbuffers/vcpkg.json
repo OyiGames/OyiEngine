@@ -1,0 +1,21 @@
+{
+  "name": "flatbuffers",
+  "version": "25.12.19",
+  "description": "FlatBuffers from the OyiGames fork (upstream 25.12.19 plus the C# Verifier identifier fix, trimmed to C++ and C#; ADR-0023). FlatBuffers is a cross platform serialization library architected for maximum memory efficiency. It allows you to directly access serialized data without parsing/unpacking it first, while still having great forwards/backwards compatibility.",
+  "homepage": "https://github.com/OyiGames/flatbuffers",
+  "license": "Apache-2.0",
+  "dependencies": [
+    {
+      "name": "flatbuffers",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

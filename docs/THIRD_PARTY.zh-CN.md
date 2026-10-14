@@ -12,7 +12,7 @@ English: [THIRD_PARTY.md](THIRD_PARTY.md)
 | mimalloc | vcpkg（3.5.3） | MIT | `SystemAllocator` 的堆（`OYI_USE_MIMALLOC`，默认开） | 使用中 |
 | GLM | vcpkg（1.0.3） | MIT | gameplay 与工具的标量数学（`oyi_transform/Glm.h`） | 使用中 |
 | Google Highway | vcpkg | Apache-2.0 | 批量 SIMD | 计划 |
-| FlatBuffers | vcpkg（25.12.19） | Apache-2.0 | 线上协议（`oyi_rpc`）、描述类资产 | 使用中 |
+| FlatBuffers | vcpkg overlay port（`vcpkg/ports/flatbuffers`），编译 [OyiGames fork](https://github.com/OyiGames/flatbuffers) `v25.12.19-oyi.1`（上游 25.12.19 + C# Verifier identifier 修复，裁剪到 C++ 与 C#） | Apache-2.0 | 线上协议（`oyi_rpc`）、描述类资产 | 使用中 |
 | Luau | vcpkg（0.741） | MIT | 脚本（`oyi_script`） | 使用中 |
 | Dear ImGui / ImPlot | vcpkg | MIT | 工具 UI | 计划 |
 | Google Benchmark | vcpkg | Apache-2.0 | 基准 | 计划 |

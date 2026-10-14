@@ -13,7 +13,7 @@ same pull request. NOTICE files of Apache-2.0 components ship with release packa
 | mimalloc | vcpkg (3.5.3) | MIT | `SystemAllocator` heap (`OYI_USE_MIMALLOC`, default on) | In use |
 | GLM | vcpkg (1.0.3) | MIT | Scalar math for gameplay and tools (`oyi_transform/Glm.h`) | In use |
 | Google Highway | vcpkg | Apache-2.0 | Batch SIMD | Planned |
-| FlatBuffers | vcpkg (25.12.19) | Apache-2.0 | Wire protocol (`oyi_rpc`), descriptive assets | In use |
+| FlatBuffers | vcpkg overlay port (`vcpkg/ports/flatbuffers`) building the [OyiGames fork](https://github.com/OyiGames/flatbuffers) `v25.12.19-oyi.1` (upstream 25.12.19 + C# Verifier identifier fix, trimmed to C++ and C#) | Apache-2.0 | Wire protocol (`oyi_rpc`), descriptive assets | In use |
 | Luau | vcpkg (0.741) | MIT | Scripting (`oyi_script`) | In use |
 | Dear ImGui / ImPlot | vcpkg | MIT | Tool UI | Planned |
 | Google Benchmark | vcpkg | Apache-2.0 | Benchmarks | Planned |
