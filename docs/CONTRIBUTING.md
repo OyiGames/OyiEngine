@@ -53,7 +53,9 @@ git-ignored files: `CMakeUserPresets.json`, `.env.local`.
 - Never commit generated files or build output (`out/`, `generated/`).
 - Milestones are tagged `vX.Y.Z` on `main`; a tag triggers the release workflow, which attaches
   the `oyi` tool for Windows x64 and macOS arm64 to the GitHub release.
-- Dependencies are added only through `vcpkg.json` and recorded in `docs/THIRD_PARTY.md`.
+- Dependencies are added only through `vcpkg.json` and recorded in `docs/THIRD_PARTY.md`; a
+  dependency we patch ourselves comes from an overlay port under `vcpkg/ports/` that builds our
+  fork (today: FlatBuffers).
 - The wire protocol schema is the `OyiProtocol` submodule at `protocol/`, pinned to a tag
   `v0.<protocol_version>.<patch>` (0.x: the MINOR number is the protocol version): clone with
   `--recurse-submodules` or run `git submodule update --init`. Protocol changes go to that
