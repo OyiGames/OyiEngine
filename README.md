@@ -16,6 +16,10 @@ Prerequisites: CMake 3.31+, Ninja, a vcpkg checkout with `VCPKG_ROOT` set, Pytho
 [tools/codegen/README.md](tools/codegen/README.md)). On Windows run inside a Visual Studio developer
 environment (`vcvars64.bat`). All commands are stateless; never `cd` into the build directory.
 
+Clone with `--recurse-submodules` (or run `git submodule update --init` afterwards): the wire
+protocol schema lives in the `protocol/` submodule. Keep the vcpkg checkout outside the repository;
+the repository's own `vcpkg/` directory holds overlay ports, not vcpkg itself.
+
 ```bash
 cmake --workflow --preset windows-msvc   # configure + Debug build + header self-containment check + tests
 cmake --preset macos && cmake --build --preset macos-debug && ctest --preset macos-debug

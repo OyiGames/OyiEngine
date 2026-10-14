@@ -11,6 +11,8 @@ English: [README.md](README.md)
 
 前置：CMake 3.31+、Ninja、一份 vcpkg 克隆并设置 `VCPKG_ROOT`、Python 3.11+ 并执行 `python -m pip install -r tools/codegen/requirements.txt`、主机工具链自带的 libclang（Visual Studio 的"C++ Clang 工具"组件、Xcode 或 Homebrew LLVM，见 [tools/codegen/README.zh-CN.md](tools/codegen/README.zh-CN.md)）；Windows 上需要在 Visual Studio 开发环境（`vcvars64.bat`）里运行。所有命令无状态，不要 `cd` 进构建目录。
 
+克隆时加 `--recurse-submodules`（或之后执行 `git submodule update --init`）：线上协议 schema 在 `protocol/` 子模块里。vcpkg 的克隆放在仓库之外；仓库自己的 `vcpkg/` 目录放的是 overlay 端口，不是 vcpkg 本身。
+
 ```bash
 cmake --workflow --preset windows-msvc   # configure + Debug 构建 + 头文件自包含检查 + 测试
 cmake --preset macos && cmake --build --preset macos-debug && ctest --preset macos-debug
