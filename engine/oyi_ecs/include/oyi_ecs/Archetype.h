@@ -35,6 +35,10 @@ public:
     ~Archetype();
 
     [[nodiscard]] uint32_t GetIndex() const noexcept { return mIndex; }
+    /// Prototype archetypes (ADR-0024) hold prototype entities only; queries, snapshots and
+    /// replication skip them. Set once by World when the archetype is created.
+    [[nodiscard]] bool IsPrototype() const noexcept { return mPrototype; }
+    void SetPrototype(bool prototype) noexcept { mPrototype = prototype; }
     [[nodiscard]] const ComponentMask& GetMask() const noexcept { return mMask; }
     [[nodiscard]] const ChunkLayout& GetLayout() const noexcept { return mLayout; }
     [[nodiscard]] uint32_t GetChunkCount() const noexcept { return static_cast<uint32_t>(mChunks.size()); }
@@ -78,6 +82,7 @@ private:
     void CopyRow(EntityLocation from, EntityLocation to) noexcept;
 
     uint32_t mIndex;
+    bool mPrototype = false;
     ComponentMask mMask;
     ChunkLayout mLayout;
     const ComponentRegistry& mRegistry;

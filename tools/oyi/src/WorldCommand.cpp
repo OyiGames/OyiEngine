@@ -19,9 +19,9 @@ namespace {
 
 void PrintSummaryJson(const ecs::WorldFileSummary& summary) {
     std::string out = std::format(
-        R"({{"formatVersion":{},"schemaHash":"{:#018x}","chunkSize":{},"worldVersion":{},"entityCount":{},"entityCapacity":{},"components":[)",
+        R"({{"formatVersion":{},"schemaHash":"{:#018x}","chunkSize":{},"worldVersion":{},"entityCount":{},"entityCapacity":{},"prototypeCount":{},"lockedCount":{},"components":[)",
         summary.mFormatVersion, summary.mSchemaHash, summary.mChunkSize, summary.mWorldVersion, summary.mEntityCount,
-        summary.mEntityCapacity);
+        summary.mEntityCapacity, summary.mPrototypeCount, summary.mLockedCount);
     for (size_t i = 0; i < summary.mComponents.size(); ++i) {
         const ecs::WorldFileSummary::Component& component = summary.mComponents[i];
         out += std::format(R"({}{{"name":{},"typeId":"{:#018x}","layoutHash":"{:#018x}","size":{},"align":{}}})",
@@ -35,7 +35,8 @@ void PrintSummaryJson(const ecs::WorldFileSummary& summary) {
         for (size_t t = 0; t < archetype.mTypes.size(); ++t) {
             out += std::format("{}{}", t == 0 ? "" : ",", archetype.mTypes[t]);
         }
-        out += std::format(R"(],"chunkCount":{},"entityCount":{}}})", archetype.mChunkCount, archetype.mEntityCount);
+        out += std::format(R"(],"chunkCount":{},"entityCount":{},"prototype":{}}})", archetype.mChunkCount,
+                           archetype.mEntityCount, archetype.mPrototype ? "true" : "false");
     }
     out += "]}\n";
     std::fputs(out.c_str(), stdout);
@@ -43,9 +44,10 @@ void PrintSummaryJson(const ecs::WorldFileSummary& summary) {
 
 void PrintSummaryText(const ecs::WorldFileSummary& summary) {
     std::fputs(std::format("world file: format {}, schema {:#018x}, chunk size {}, version {}\n"
-                           "entities: {} alive of {} slots; archetypes: {}\n",
+                           "entities: {} alive of {} slots ({} prototypes, {} locked); archetypes: {}\n",
                            summary.mFormatVersion, summary.mSchemaHash, summary.mChunkSize, summary.mWorldVersion,
-                           summary.mEntityCount, summary.mEntityCapacity, summary.mArchetypes.size())
+                           summary.mEntityCount, summary.mEntityCapacity, summary.mPrototypeCount, summary.mLockedCount,
+                           summary.mArchetypes.size())
                    .c_str(),
                stdout);
     for (size_t i = 0; i < summary.mComponents.size(); ++i) {
@@ -62,8 +64,8 @@ void PrintSummaryText(const ecs::WorldFileSummary& summary) {
             types += std::format("{}{}", types.empty() ? "" : " + ",
                                  type < summary.mComponents.size() ? summary.mComponents[type].mName : "?");
         }
-        std::fputs(std::format("  archetype {:3}: {} entities in {} chunk(s): {}\n", i, archetype.mEntityCount,
-                               archetype.mChunkCount, types)
+        std::fputs(std::format("  archetype {:3}: {} entities in {} chunk(s){}: {}\n", i, archetype.mEntityCount,
+                               archetype.mChunkCount, archetype.mPrototype ? " (prototype)" : "", types)
                        .c_str(),
                    stdout);
     }

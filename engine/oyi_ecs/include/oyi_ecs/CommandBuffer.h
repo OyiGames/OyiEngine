@@ -42,7 +42,12 @@ public:
     [[nodiscard]] uint64_t GetSortKey() const noexcept { return mSortKey; }
 
     [[nodiscard]] PendingEntity CreateEntity(const ComponentMask& mask) noexcept;
+    /// World::CloneEntity at replay (ADR-0024: a prototype instance). Skipped if `source` died.
+    [[nodiscard]] PendingEntity CloneEntity(EntityId source) noexcept;
     void DestroyEntity(EntityId entity) noexcept;
+    /// World::SetMark at replay.
+    void SetMark(EntityId entity, EntityMark mark) noexcept;
+    void SetMark(PendingEntity entity, EntityMark mark) noexcept;
 
     void AddComponent(EntityId entity, ComponentTypeIndex type) noexcept;
     void AddComponent(PendingEntity entity, ComponentTypeIndex type) noexcept;
@@ -76,15 +81,16 @@ public:
 private:
     friend class World;
 
-    enum class Op : uint8_t { Create, Destroy, Add, Remove, Set, Enable };
+    enum class Op : uint8_t { Create, Clone, Destroy, Add, Remove, Set, Enable, Mark };
 
     struct Command {
         uint64_t mSortKey = 0;
         Op mOp            = Op::Create;
-        bool mFlag        = false; ///< Enable: the new state
+        bool mFlag        = false;            ///< Enable: the new state
+        EntityMark mMark  = EntityMark::None; ///< Mark: the new mark
         ComponentTypeIndex mType;
-        EntityId mEntity;       ///< target when mPending is invalid
-        PendingEntity mPending; ///< target created earlier in this buffer; Create: the slot it fills
+        EntityId mEntity;       ///< target when mPending is invalid; Clone: the source
+        PendingEntity mPending; ///< target created earlier in this buffer; Create / Clone: the slot it fills
         uint32_t mPayloadOffset = 0;
         uint32_t mPayloadSize   = 0;
     };

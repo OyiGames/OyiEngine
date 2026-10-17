@@ -26,7 +26,12 @@ namespace oyi::ecs {
 World::World(core::Allocator& allocator) noexcept : World(allocator, Config{}) {}
 
 World::World(core::Allocator& allocator, Config config) noexcept
-    : mAllocator(allocator), mConfig(config), mResource(allocator), mEntities(allocator), mArchetypes(&mResource) {
+    : mAllocator(allocator)
+    , mConfig(config)
+    , mResource(allocator)
+    , mEntities(allocator)
+    , mArchetypes(&mResource)
+    , mMarks(&mResource) {
     const core::Expected<ResourceTypeIndex> environment =
         mResources.Register(kEnvironmentResourceName, mEnvironment, ResourceOrdering::Automatic);
     OYI_CHECK(environment.has_value() && *environment == kEnvironmentResource,
@@ -43,7 +48,7 @@ World::~World() {
 
 const Archetype* World::FindArchetype(const ComponentMask& mask) const noexcept {
     for (const Archetype* const archetype : mArchetypes) {
-        if (archetype->GetMask() == mask) {
+        if (!archetype->IsPrototype() && archetype->GetMask() == mask) {
             return archetype;
         }
     }
@@ -52,9 +57,10 @@ const Archetype* World::FindArchetype(const ComponentMask& mask) const noexcept 
 
 // pmr containers report exhaustion through MemoryResource, which terminates; they never throw.
 // NOLINTNEXTLINE(bugprone-exception-escape)
-core::Expected<Archetype*> World::GetOrCreateArchetype(const ComponentMask& mask) noexcept {
-    const auto found =
-        std::ranges::find_if(mArchetypes, [&mask](const Archetype* archetype) { return archetype->GetMask() == mask; });
+core::Expected<Archetype*> World::GetOrCreateArchetype(const ComponentMask& mask, bool prototype) noexcept {
+    const auto found = std::ranges::find_if(mArchetypes, [&mask, prototype](const Archetype* archetype) {
+        return archetype->IsPrototype() == prototype && archetype->GetMask() == mask;
+    });
     if (found != mArchetypes.end()) {
         return *found;
     }
@@ -69,6 +75,7 @@ core::Expected<Archetype*> World::GetOrCreateArchetype(const ComponentMask& mask
         mArchetypes.pop_back();
         return core::Fail(core::ErrorCode::OutOfMemory, "World: cannot allocate an archetype");
     }
+    mArchetypes.back()->SetPrototype(prototype);
     return mArchetypes.back();
 }
 
@@ -86,7 +93,49 @@ core::Expected<EntityId> World::CreateEntity(std::span<const ComponentTypeIndex>
 }
 
 core::Expected<EntityId> World::CreateEntity(const ComponentMask& mask) noexcept {
-    core::Expected<Archetype*> archetype = GetOrCreateArchetype(mask);
+    return CreateEntityIn(mask, false);
+}
+
+core::Expected<EntityId> World::CreatePrototype(const ComponentMask& mask) noexcept {
+    const core::Expected<EntityId> entity = CreateEntityIn(mask, true);
+    if (entity.has_value()) {
+        RememberMark(*entity, EntityMark::Prototype);
+    }
+    return entity;
+}
+
+// pmr containers report exhaustion through MemoryResource, which terminates; they never throw.
+// NOLINTNEXTLINE(bugprone-exception-escape)
+void World::RememberMark(EntityId entity, EntityMark mark) noexcept {
+    if (mMarks.size() <= entity.mIndex) {
+        if (mark == EntityMark::None) {
+            return;
+        }
+        mMarks.resize(static_cast<size_t>(entity.mIndex) + 1, EntityMark::None);
+    }
+    mMarks[entity.mIndex] = mark;
+}
+
+EntityMark World::GetMark(EntityId entity) const noexcept {
+    if (!mEntities.IsAlive(entity) || mMarks.size() <= entity.mIndex) {
+        return EntityMark::None;
+    }
+    return mMarks[entity.mIndex];
+}
+
+core::Result World::SetMark(EntityId entity, EntityMark mark) noexcept {
+    if (!mEntities.IsAlive(entity)) {
+        return core::Fail(core::ErrorCode::NotFound, "World: entity is not alive");
+    }
+    if (mark == EntityMark::Prototype || GetMark(entity) == EntityMark::Prototype) {
+        return core::Fail(core::ErrorCode::InvalidArgument, "World: Prototype is set by CreatePrototype only");
+    }
+    RememberMark(entity, mark);
+    return {};
+}
+
+core::Expected<EntityId> World::CreateEntityIn(const ComponentMask& mask, bool prototype) noexcept {
+    core::Expected<Archetype*> archetype = GetOrCreateArchetype(mask, prototype);
     if (!archetype.has_value()) {
         return core::Fail(archetype.error().mCode, archetype.error().mMessage);
     }
@@ -97,6 +146,7 @@ core::Expected<EntityId> World::CreateEntity(const ComponentMask& mask) noexcept
         return core::Fail(row.error().mCode, row.error().mMessage);
     }
     mEntities.SetLocation(entity, *row);
+    RememberMark(entity, EntityMark::None);
     return entity;
 }
 
@@ -113,6 +163,7 @@ core::Result World::DestroyEntity(EntityId entity) noexcept {
     }
     const EntityLocation row = mEntities.GetLocation(entity);
     RemoveRow(*mArchetypes[row.mArchetype], row);
+    RememberMark(entity, EntityMark::None);
     mEntities.Destroy(entity);
     return {};
 }
@@ -132,12 +183,12 @@ bool World::HasComponent(EntityId entity, ComponentTypeIndex type) const noexcep
 }
 
 core::Result World::MoveEntity(EntityId entity, const ComponentMask& targetMask) noexcept {
-    core::Expected<Archetype*> target = GetOrCreateArchetype(targetMask);
+    const EntityLocation sourceRow    = mEntities.GetLocation(entity);
+    Archetype& source                 = *mArchetypes[sourceRow.mArchetype];
+    core::Expected<Archetype*> target = GetOrCreateArchetype(targetMask, source.IsPrototype());
     if (!target.has_value()) {
         return core::Fail(target.error().mCode, target.error().mMessage);
     }
-    const EntityLocation sourceRow           = mEntities.GetLocation(entity);
-    Archetype& source                        = *mArchetypes[sourceRow.mArchetype];
     const core::Expected<EntityLocation> row = (*target)->Allocate(entity, mVersion);
     if (!row.has_value()) {
         return core::Fail(row.error().mCode, row.error().mMessage);
@@ -155,6 +206,9 @@ core::Result World::AddComponent(EntityId entity, ComponentTypeIndex type) noexc
     if (!mComponents.IsRegistered(type)) {
         return core::Fail(core::ErrorCode::InvalidArgument, "World: unregistered component type");
     }
+    if (GetMark(entity) == EntityMark::Locked) {
+        return core::Fail(core::ErrorCode::InvalidState, "World: the entity's composition is locked (ADR-0024)");
+    }
     const ComponentMask& current = mArchetypes[mEntities.GetLocation(entity).mArchetype]->GetMask();
     if (current.Test(type)) {
         return core::Fail(core::ErrorCode::AlreadyExists, "World: entity already has the component");
@@ -165,6 +219,9 @@ core::Result World::AddComponent(EntityId entity, ComponentTypeIndex type) noexc
 core::Result World::RemoveComponent(EntityId entity, ComponentTypeIndex type) noexcept {
     if (!mEntities.IsAlive(entity)) {
         return core::Fail(core::ErrorCode::NotFound, "World: entity is not alive");
+    }
+    if (GetMark(entity) == EntityMark::Locked) {
+        return core::Fail(core::ErrorCode::InvalidState, "World: the entity's composition is locked (ADR-0024)");
     }
     const ComponentMask& current = mArchetypes[mEntities.GetLocation(entity).mArchetype]->GetMask();
     if (!type.IsValid() || !current.Test(type)) {
@@ -278,8 +335,10 @@ World::ReplayStats World::ReplayCommands(std::span<CommandBuffer* const> buffers
     for (const Ref& ref : order) {
         const CommandBuffer& buffer           = *buffers[ref.mBuffer];
         const CommandBuffer::Command& command = buffer.mCommands[ref.mCommand];
-        if (command.mOp == CommandBuffer::Op::Create) {
-            const core::Expected<EntityId> entity = CreateEntity(buffer.mCreateMasks[command.mPending.mIndex]);
+        if (command.mOp == CommandBuffer::Op::Create || command.mOp == CommandBuffer::Op::Clone) {
+            const core::Expected<EntityId> entity = command.mOp == CommandBuffer::Op::Create
+                                                        ? CreateEntity(buffer.mCreateMasks[command.mPending.mIndex])
+                                                        : CloneEntity(command.mEntity);
             if (entity.has_value()) {
                 created[ref.mBuffer][command.mPending.mIndex] = *entity;
                 ++stats.mApplied;
@@ -319,7 +378,11 @@ World::ReplayStats World::ReplayCommands(std::span<CommandBuffer* const> buffers
                 applied = true;
             }
             break;
+        case CommandBuffer::Op::Mark:
+            applied = SetMark(target, command.mMark).has_value();
+            break;
         case CommandBuffer::Op::Create:
+        case CommandBuffer::Op::Clone:
             break;
         }
         if (applied) {

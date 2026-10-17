@@ -17,7 +17,8 @@ Query::Query(core::Allocator& allocator, const ComponentMask& all, const Compone
 std::span<const uint32_t> Query::GetMatches(const World& world) noexcept {
     const uint32_t count = world.GetArchetypeCount();
     for (uint32_t index = mArchetypesSeen; index < count; ++index) {
-        if (Matches(world.GetArchetype(index).GetMask())) {
+        const Archetype& archetype = world.GetArchetype(index);
+        if (!archetype.IsPrototype() && Matches(archetype.GetMask())) {
             mMatches.push_back(index);
         }
     }

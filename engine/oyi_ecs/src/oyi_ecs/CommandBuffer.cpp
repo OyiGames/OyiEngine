@@ -41,6 +41,15 @@ PendingEntity CommandBuffer::CreateEntity(const ComponentMask& mask) noexcept {
     return pending;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
+PendingEntity CommandBuffer::CloneEntity(EntityId source) noexcept {
+    // A clone fills a create slot like a Create does; the mask entry only keeps the slots aligned.
+    const PendingEntity pending{.mIndex = static_cast<uint32_t>(mCreateMasks.size())};
+    mCreateMasks.emplace_back();
+    Record(Op::Clone, ComponentTypeIndex::Invalid(), source, pending, 0, 0, false);
+    return pending;
+}
+
 void CommandBuffer::DestroyEntity(EntityId entity) noexcept {
     Record(Op::Destroy, ComponentTypeIndex::Invalid(), entity, PendingEntity{}, 0, 0, false);
 }
@@ -78,6 +87,16 @@ void CommandBuffer::SetComponentEnabled(EntityId entity, ComponentTypeIndex type
 
 void CommandBuffer::SetComponentEnabled(PendingEntity entity, ComponentTypeIndex type, bool enabled) noexcept {
     Record(Op::Enable, type, EntityId::Invalid(), entity, 0, 0, enabled);
+}
+
+void CommandBuffer::SetMark(EntityId entity, EntityMark mark) noexcept {
+    Record(Op::Mark, ComponentTypeIndex::Invalid(), entity, PendingEntity{}, 0, 0, false);
+    mCommands.back().mMark = mark;
+}
+
+void CommandBuffer::SetMark(PendingEntity entity, EntityMark mark) noexcept {
+    Record(Op::Mark, ComponentTypeIndex::Invalid(), EntityId::Invalid(), entity, 0, 0, false);
+    mCommands.back().mMark = mark;
 }
 
 void CommandBuffer::Clear() noexcept {

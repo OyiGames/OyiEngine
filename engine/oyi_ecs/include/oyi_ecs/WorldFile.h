@@ -28,6 +28,7 @@ struct WorldFileSummary {
         std::pmr::vector<uint16_t> mTypes; ///< indices into mComponents
         uint32_t mChunkCount  = 0;
         uint32_t mEntityCount = 0;
+        bool mPrototype       = false; ///< ADR-0024: holds prototype entities, skipped by queries
     };
 
     explicit WorldFileSummary(core::Allocator& allocator) noexcept;
@@ -39,6 +40,8 @@ struct WorldFileSummary {
     uint32_t mWorldVersion   = 0;
     uint32_t mEntityCapacity = 0; ///< slots in the entity table
     uint32_t mEntityCount    = 0; ///< alive entities
+    uint32_t mPrototypeCount = 0; ///< entities marked Prototype (ADR-0024)
+    uint32_t mLockedCount    = 0; ///< entities marked Locked
     std::pmr::vector<Component> mComponents;
     std::pmr::vector<Archetype> mArchetypes;
 };

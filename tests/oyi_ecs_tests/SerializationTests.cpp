@@ -1,5 +1,6 @@
 #include <oyi_core/Expected.h>
 #include <oyi_core/SystemAllocator.h>
+#include <oyi_ecs/ChunkView.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
@@ -26,6 +27,7 @@ using oyi::core::SystemAllocator;
 using oyi::ecs::ComponentMask;
 using oyi::ecs::ComponentTypeIndex;
 using oyi::ecs::EntityId;
+using oyi::ecs::EntityMark;
 using oyi::ecs::EntityRegistry;
 using oyi::ecs::World;
 using namespace oyi::ecs_fixture;
@@ -144,7 +146,7 @@ TEST_CASE("a saved world describes itself without a registry", "[ecs][serializat
     const std::pmr::vector<std::byte> bytes = SaveOf(original.mWorld);
     oyi::ecs::WorldFileSummary summary(original.mAllocator);
     REQUIRE(oyi::ecs::DescribeSavedWorld(bytes, summary).has_value());
-    CHECK(summary.mFormatVersion == 1);
+    CHECK(summary.mFormatVersion == 2);
     CHECK(summary.mSchemaHash == original.mWorld.ComputeSchemaHash());
     CHECK(summary.mChunkSize == 16 * 1024);
     CHECK(summary.mWorldVersion == original.mWorld.GetVersion());
@@ -333,4 +335,43 @@ TEST_CASE("the entity registry restores its table with the lowest dead index on 
     registry.Clear();
     CHECK(registry.GetCapacity() == 0);
     CHECK(registry.GetAliveCount() == 0);
+}
+
+TEST_CASE("marks and prototype archetypes survive the world file", "[ecs][serialization][object]") {
+    SystemAllocator allocator;
+    World world(allocator);
+    const Types types                          = RegisterAll(world);
+    const EntityId prototype                   = *world.CreatePrototype(MaskOf({types.mPosition, types.mVelocity}));
+    world.GetForWrite<Position>(prototype)->mX = 9.0f;
+    const EntityId locked                      = *world.CloneEntity(prototype);
+    const EntityId plain                       = *world.CreateEntity(MaskOf({types.mPosition, types.mVelocity}));
+    const EntityId unlocked                    = *world.CloneEntity(plain);
+    REQUIRE(world.SetMark(plain, EntityMark::Locked).has_value());
+    REQUIRE(world.SetMark(unlocked, EntityMark::None).has_value());
+    const std::pmr::vector<std::byte> bytes = SaveOf(world);
+
+    oyi::ecs::WorldFileSummary summary(allocator);
+    REQUIRE(oyi::ecs::DescribeSavedWorld(bytes, summary).has_value());
+    CHECK(summary.mEntityCount == 4);
+    CHECK(summary.mPrototypeCount == 1);
+    CHECK(summary.mLockedCount == 2);
+    REQUIRE(summary.mArchetypes.size() == 2);
+    CHECK((summary.mArchetypes[0].mPrototype ? 1 : 0) + (summary.mArchetypes[1].mPrototype ? 1 : 0) == 1);
+
+    World loaded(allocator);
+    const Types loadedTypes = RegisterAll(loaded);
+    REQUIRE(loaded.Load(bytes).has_value());
+    CHECK(loaded.GetMark(prototype) == EntityMark::Prototype);
+    CHECK(loaded.GetMark(locked) == EntityMark::Locked);
+    CHECK(loaded.GetMark(plain) == EntityMark::Locked);
+    CHECK(loaded.GetMark(unlocked) == EntityMark::None);
+    CHECK(loaded.Get<Position>(prototype)->mX == 9.0f);
+    uint32_t rows = 0;
+    loaded.ForEachChunk(MaskOf({loadedTypes.mPosition}), ComponentMask{},
+                        [&rows](oyi::ecs::ChunkView& view) { rows += view.GetCount(); });
+    CHECK(rows == 3); // the prototype stays out of iteration after loading too
+    CHECK(loaded.AddComponent(locked, loadedTypes.mHealth).error().mCode == ErrorCode::InvalidState);
+    const EntityId again = *loaded.CloneEntity(prototype);
+    CHECK(loaded.GetMark(again) == EntityMark::Locked);
+    CHECK(loaded.Get<Position>(again)->mX == 9.0f);
 }

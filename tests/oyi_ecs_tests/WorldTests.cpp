@@ -27,6 +27,7 @@ using oyi::ecs::ChunkView;
 using oyi::ecs::ComponentMask;
 using oyi::ecs::ComponentTypeIndex;
 using oyi::ecs::EntityId;
+using oyi::ecs::EntityMark;
 using oyi::ecs::World;
 using namespace oyi::ecs_fixture;
 
@@ -334,4 +335,67 @@ TEST_CASE("random structural changes agree with a reference model", "[ecs][world
         REQUIRE(f.mWorld.DestroyEntity(entity).has_value());
     }
     CHECK(f.mWorld.GetStats().mChunks == 0);
+}
+
+TEST_CASE("prototype entities live apart from queries and their clones are locked", "[ecs][world][object]") {
+    Fixture f;
+    const uint32_t before    = f.mWorld.GetArchetypeCount();
+    const EntityId prototype = *f.mWorld.CreatePrototype(MaskOf({f.mPosition, f.mVelocity}));
+    CHECK(f.mWorld.GetMark(prototype) == EntityMark::Prototype);
+    CHECK(f.mWorld.GetArchetypeCount() == before + 1);
+    f.mWorld.GetForWrite<Position>(prototype)->mX = 7.0f;
+    f.mWorld.SetComponentEnabled(prototype, f.mVelocity, false);
+
+    // Invisible to iteration, readable through the entity API.
+    uint32_t rows = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mPosition}), ComponentMask{},
+                          [&rows](ChunkView& view) { rows += view.GetCount(); });
+    CHECK(rows == 0);
+    CHECK(f.mWorld.Get<Position>(prototype)->mX == 7.0f);
+    CHECK(f.mWorld.FindArchetype(MaskOf({f.mPosition, f.mVelocity})) == nullptr); // only the prototype one exists
+
+    // Composition of a prototype may still change; it stays in prototype archetypes.
+    REQUIRE(f.mWorld.AddComponent(prototype, f.mHealth).has_value());
+    CHECK(f.mWorld.GetMark(prototype) == EntityMark::Prototype);
+    rows = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mHealth}), ComponentMask{}, [&rows](ChunkView& view) { rows += view.GetCount(); });
+    CHECK(rows == 0);
+
+    // A clone is an ordinary, locked instance in the ordinary archetype of the same mask.
+    const EntityId instance = *f.mWorld.CloneEntity(prototype);
+    CHECK(f.mWorld.GetMark(instance) == EntityMark::Locked);
+    CHECK(f.mWorld.Get<Position>(instance)->mX == 7.0f);
+    CHECK_FALSE(f.mWorld.IsComponentEnabled(instance, f.mVelocity));
+    CHECK(f.mWorld.FindArchetype(MaskOf({f.mPosition, f.mVelocity, f.mHealth})) != nullptr);
+    rows = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mPosition}), ComponentMask{},
+                          [&rows](ChunkView& view) { rows += view.GetCount(); });
+    CHECK(rows == 1);
+    CHECK(f.mWorld.AddComponent(instance, f.mFrozen).error().mCode == ErrorCode::InvalidState);
+    CHECK(f.mWorld.RemoveComponent(instance, f.mHealth).error().mCode == ErrorCode::InvalidState);
+    CHECK(f.mWorld.HasComponent(instance, f.mHealth));
+    f.mWorld.SetComponentEnabled(instance, f.mVelocity, true); // enable bits are the escape hatch
+    CHECK(f.mWorld.IsComponentEnabled(instance, f.mVelocity));
+
+    // Marks: None <-> Locked by hand; Prototype only through CreatePrototype.
+    REQUIRE(f.mWorld.SetMark(instance, EntityMark::None).has_value());
+    REQUIRE(f.mWorld.AddComponent(instance, f.mFrozen).has_value());
+    REQUIRE(f.mWorld.SetMark(instance, EntityMark::Locked).has_value());
+    CHECK(f.mWorld.RemoveComponent(instance, f.mFrozen).error().mCode == ErrorCode::InvalidState);
+    CHECK(f.mWorld.SetMark(instance, EntityMark::Prototype).error().mCode == ErrorCode::InvalidArgument);
+    CHECK(f.mWorld.SetMark(prototype, EntityMark::Locked).error().mCode == ErrorCode::InvalidArgument);
+    CHECK(f.mWorld.SetMark(EntityId{.mIndex = 99, .mGeneration = 1}, EntityMark::Locked).error().mCode ==
+          ErrorCode::NotFound);
+
+    // Cloning an ordinary entity gives an unmarked twin in the same archetype.
+    const EntityId twin = *f.mWorld.CloneEntity(instance);
+    CHECK(f.mWorld.GetMark(twin) == EntityMark::None);
+    CHECK(*f.mWorld.GetComponentMask(twin) == *f.mWorld.GetComponentMask(instance));
+
+    // A recycled index starts unmarked.
+    REQUIRE(f.mWorld.DestroyEntity(instance).has_value());
+    CHECK(f.mWorld.GetMark(instance) == EntityMark::None);
+    const EntityId reused = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    CHECK(reused.mIndex == instance.mIndex);
+    CHECK(f.mWorld.GetMark(reused) == EntityMark::None);
 }

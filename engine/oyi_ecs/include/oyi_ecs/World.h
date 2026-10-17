@@ -100,6 +100,14 @@ public:
     [[nodiscard]] core::Expected<EntityId> CreateEntity(std::span<const ComponentTypeIndex> types) noexcept;
     /// Fails with NotFound when the handle is stale.
     [[nodiscard]] core::Result DestroyEntity(EntityId entity) noexcept;
+    /// An entity in a prototype archetype (ADR-0024): invisible to ForEachChunk, queries,
+    /// snapshots and replication, readable and writable through Get / GetForWrite, and the
+    /// source of CloneEntity. Its mark is Prototype.
+    [[nodiscard]] core::Expected<EntityId> CreatePrototype(const ComponentMask& mask) noexcept;
+    /// None for dead entities. Prototype comes only from CreatePrototype; SetMark switches
+    /// between None and Locked (ADR-0024: a locked composition refuses Add / RemoveComponent).
+    [[nodiscard]] EntityMark GetMark(EntityId entity) const noexcept;
+    [[nodiscard]] core::Result SetMark(EntityId entity, EntityMark mark) noexcept;
     [[nodiscard]] bool IsAlive(EntityId entity) const noexcept { return mEntities.IsAlive(entity); }
     [[nodiscard]] uint32_t GetEntityCount() const noexcept { return mEntities.GetAliveCount(); }
 
@@ -169,7 +177,8 @@ public:
     template <typename Fn>
     void ForEachChunk(const ComponentMask& all, const ComponentMask& none, Fn&& fn) {
         for (Archetype* const archetype : mArchetypes) {
-            if (!archetype->GetMask().Contains(all) || archetype->GetMask().Intersects(none)) {
+            if (archetype->IsPrototype() || !archetype->GetMask().Contains(all) ||
+                archetype->GetMask().Intersects(none)) {
                 continue;
             }
             for (uint32_t chunk = 0; chunk < archetype->GetChunkCount(); ++chunk) {
@@ -197,6 +206,7 @@ public:
         ForEachChunk(query, mVersion, fn);
     }
 
+    /// The ordinary (non-prototype) archetype with exactly `mask`, or nullptr.
     [[nodiscard]] const Archetype* FindArchetype(const ComponentMask& mask) const noexcept;
     [[nodiscard]] const Archetype& GetArchetype(uint32_t index) const noexcept { return *mArchetypes[index]; }
     /// For code that builds ChunkViews of its own (the schedule's chunk tasks).
@@ -227,12 +237,16 @@ public:
     /// Destroys every entity and archetype; registries, resources and the version stay.
     void Clear() noexcept;
 
-    /// A new entity in the same archetype with a copy of every component and enable bit of
-    /// `source` (the prototype path of ADR-0013). Fails with NotFound for a dead source.
+    /// A new entity with a copy of every component and enable bit of `source` (the prototype
+    /// path of ADR-0013 / ADR-0024). Cloning a Prototype entity gives a Locked instance in the
+    /// ordinary archetype of the same mask; cloning anything else gives an unmarked twin in the
+    /// same archetype. Fails with NotFound for a dead source.
     [[nodiscard]] core::Expected<EntityId> CloneEntity(EntityId source) noexcept;
 
 private:
-    [[nodiscard]] core::Expected<Archetype*> GetOrCreateArchetype(const ComponentMask& mask) noexcept;
+    [[nodiscard]] core::Expected<Archetype*> GetOrCreateArchetype(const ComponentMask& mask, bool prototype) noexcept;
+    [[nodiscard]] core::Expected<EntityId> CreateEntityIn(const ComponentMask& mask, bool prototype) noexcept;
+    void RememberMark(EntityId entity, EntityMark mark) noexcept;
     [[nodiscard]] core::Result MoveEntity(EntityId entity, const ComponentMask& targetMask) noexcept;
     void RemoveRow(Archetype& archetype, EntityLocation row) noexcept;
 
@@ -245,6 +259,7 @@ private:
     Environment mEnvironment;
     EntityRegistry mEntities;
     std::pmr::vector<Archetype*> mArchetypes;
+    std::pmr::vector<EntityMark> mMarks; ///< by entity index; None when shorter than the index
     uint32_t mVersion = 1;
 };
 
