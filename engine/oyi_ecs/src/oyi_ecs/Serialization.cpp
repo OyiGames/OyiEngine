@@ -400,7 +400,7 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
             Clear();
             return Corrupt("World::Load: the file holds a managed type this world does not know");
         }
-        ManagedObject* const object = info->mCreate(mAllocator);
+        ManagedObject* const object = info->mCreate(mAllocator, *info);
         if (object == nullptr) {
             Clear();
             return core::Fail(core::ErrorCode::OutOfMemory, "World::Load: cannot allocate a managed object");

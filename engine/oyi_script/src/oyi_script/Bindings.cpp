@@ -5,10 +5,13 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Firewall.h>
+#include <oyi_ecs/Managed.h>
 #include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Resource.h>
+#include <oyi_ecs/System.h>
 #include <oyi_ecs/World.h>
+#include <oyi_script/ScriptManaged.h>
 #include <oyi_script/ScriptVm.h>
 #include <oyi_script/detail/Bindings.h>
 
@@ -71,11 +74,15 @@ struct Key {
     return *window;
 }
 
+} // namespace
+
 // --- handles ------------------------------------------------------------------------------------
 
 void PushEntity(lua_State* state, EntityId entity) noexcept {
     lua_pushlightuserdatatagged(state, reinterpret_cast<void*>(static_cast<uintptr_t>(entity.ToU64())), kEntityTag);
 }
+
+namespace {
 
 void PushHandle(lua_State* state, uint64_t packed) noexcept {
     lua_pushlightuserdatatagged(state, reinterpret_cast<void*>(static_cast<uintptr_t>(packed)), kHandleTag);
@@ -146,10 +153,7 @@ void PushPending(lua_State* state, PendingEntity pending) noexcept {
     return mask;
 }
 
-// --- reflection: bytes <-> tables -------------------------------------------------------------
-
-void PushRecord(lua_State* state, const ScriptVm& vm, const ComponentInfo& info, const std::byte* data);
-void ReadRecord(lua_State* state, const ScriptVm& vm, const ComponentInfo& info, int tableIndex, std::byte* data);
+// --- reflection: bytes <-> tables (PushRecord / ReadRecord are declared in Bindings.h) ---------
 
 template <typename T>
 [[nodiscard]] double LoadAs(const std::byte* at) noexcept {
@@ -312,6 +316,8 @@ void ReadElement(lua_State* state, const ScriptVm& vm, const FieldInfo& field, i
     }
 }
 
+} // namespace
+
 void PushRecord(lua_State* state, const ScriptVm& vm, const ComponentInfo& info, const std::byte* data) {
     lua_createtable(state, 0, static_cast<int>(info.mFields.size()));
     for (const FieldInfo& field : info.mFields) {
@@ -361,6 +367,8 @@ void ReadRecord(lua_State* state, const ScriptVm& vm, const ComponentInfo& info,
         lua_pop(state, 1);
     }
 }
+
+namespace {
 
 /// A value of `info` starting from `base` (or the type's default) with the table's fields applied.
 /// Returns the byte count; `buffer` must hold info.mSize bytes.
@@ -575,9 +583,191 @@ int EntityToString(lua_State* state) {
     return 1;
 }
 
-constexpr std::array<luaL_Reg, 19> kLibrary{{{.name = "component", .func = &Component},
+/// oyi.managed_type(stateName, { reads = {...}, writes = {...}, receives = {...}, sends = {...} })
+/// -> managed type handle. Only at a module's top level: the type belongs to that module.
+int ManagedType(lua_State* state) {
+    ScriptVm& vm                    = VmOf(state);
+    const char* const name          = luaL_checkstring(state, 1);
+    const ComponentInfo* const info = vm.FindInfo(core::MakeTypeId(name));
+    if (info == nullptr) {
+        luaL_error(state, "oyi: unknown state block %s (RegisterStruct it or make it a component)", name);
+    }
+    if (!vm.GetCurrentModule().IsValid() || vm.GetWindow() != nullptr) {
+        luaL_error(state, "oyi: managed_type is for a module's top level");
+    }
+    luaL_checktype(state, 2, LUA_TTABLE);
+    const auto componentSet = [state](const char* key) {
+        lua_getfield(state, 2, key);
+        const ComponentMask mask = lua_isnil(state, -1) ? ComponentMask{} : CheckMask(state, -1);
+        lua_pop(state, 1);
+        return mask;
+    };
+    const auto messageSet = [state](const char* key) {
+        lua_getfield(state, 2, key);
+        ecs::MessageMask mask;
+        if (!lua_isnil(state, -1)) {
+            luaL_checktype(state, -1, LUA_TTABLE);
+            const int count = lua_objlen(state, -1);
+            for (int i = 1; i <= count; ++i) {
+                lua_rawgeti(state, -1, i);
+                mask.Set(CheckMessage(state, -1));
+                lua_pop(state, 1);
+            }
+        }
+        lua_pop(state, 1);
+        return mask;
+    };
+    const ComponentMask reads       = componentSet("reads");
+    const ComponentMask writes      = componentSet("writes");
+    const ecs::MessageMask receives = messageSet("receives");
+    const ecs::MessageMask sends    = messageSet("sends");
+    const auto declared = vm.DeclareManagedType(*info, vm.GetCurrentModule(), reads, writes, receives, sends);
+    if (!declared.has_value()) {
+        luaL_error(state, "oyi: cannot declare managed type %s: %.*s", name,
+                   static_cast<int>(declared.error().mMessage.size()), declared.error().mMessage.data());
+    }
+    const std::span<const ManagedTypeInfo* const> types = vm.GetWorld().GetManagedTypes().GetAll();
+    for (size_t i = 0; i < types.size(); ++i) {
+        if (types[i] == &(*declared)->GetInfo()) {
+            lua_pushinteger(state, static_cast<int>(i));
+            return 1;
+        }
+    }
+    luaL_error(state, "oyi: the managed type did not register");
+}
+
+// --- the restricted ctx of a scripted managed object ----------------------------------------------
+
+[[nodiscard]] ScriptManagedObject& ObjectOf(lua_State* state) {
+    auto* const object = static_cast<ScriptManagedObject*>(lua_tolightuserdata(state, lua_upvalueindex(1)));
+    if (object == nullptr || object->GetContext() == nullptr) {
+        luaL_error(state, "oyi: ctx is only usable inside update");
+    }
+    return *object;
+}
+
+/// ctx.get(type) -> table | nil   (the owner's live value; declared read or write)
+int CtxGet(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    const ComponentTypeIndex type     = CheckComponent(state, 1);
+    const ScriptManagedType& kind     = object.GetScriptType();
+    // Both gates: the type's declaration and the system the schedule built from it (a reloaded
+    // module may not widen its access until the schedule is rebuilt).
+    if ((!kind.GetReads().Test(type) && !kind.GetWrites().Test(type)) ||
+        !object.GetContext()->GetSystem().CanRead(type)) {
+        luaL_error(state, "oyi: ctx.get: the component type is not declared in reads or writes");
+    }
+    const ScriptVm& vm      = VmOf(state);
+    const void* const value = object.GetContext()->GetSystem().Lookup<void>(type, object.GetOwner());
+    if (value == nullptr) {
+        lua_pushnil(state);
+        return 1;
+    }
+    PushRecord(state, vm, vm.GetWorld().GetComponents().GetInfo(type), static_cast<const std::byte*>(value));
+    return 1;
+}
+
+/// ctx.prev(type) -> table | nil   (the owner's value at the last sync point; declared read)
+int CtxPrev(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    const ComponentTypeIndex type     = CheckComponent(state, 1);
+    if (!object.GetScriptType().GetReads().Test(type) || !object.GetContext()->GetSystem().CanRead(type)) {
+        luaL_error(state, "oyi: ctx.prev: the component type is not declared in reads");
+    }
+    const ScriptVm& vm      = VmOf(state);
+    const void* const value = object.GetContext()->Prev<void>(type);
+    if (value == nullptr) {
+        lua_pushnil(state);
+        return 1;
+    }
+    PushRecord(state, vm, vm.GetWorld().GetComponents().GetInfo(type), static_cast<const std::byte*>(value));
+    return 1;
+}
+
+/// ctx.set(type, table)   writes the owner's component now (declared write); absent fields keep their value
+int CtxSet(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    const ComponentTypeIndex type     = CheckComponent(state, 1);
+    if (!object.GetScriptType().GetWrites().Test(type) || !object.GetContext()->GetSystem().CanWrite(type)) {
+        luaL_error(state, "oyi: ctx.set: the component type is not declared in writes");
+    }
+    luaL_checktype(state, 2, LUA_TTABLE);
+    const ScriptVm& vm = VmOf(state);
+    void* const value  = object.GetContext()->GetSystem().LookupForWrite<void>(type, object.GetOwner());
+    if (value != nullptr) {
+        ReadRecord(state, vm, vm.GetWorld().GetComponents().GetInfo(type), 2, static_cast<std::byte*>(value));
+    }
+    return 0;
+}
+
+/// ctx.received(type) -> array of tables   (messages to the owner or broadcast; declared receive)
+int CtxReceived(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    const MessageTypeIndex type       = CheckMessage(state, 1);
+    if (!object.GetScriptType().GetReceives().Test(type) || !object.GetContext()->GetSystem().CanReceive(type)) {
+        luaL_error(state, "oyi: ctx.received: the message type is not declared in receives");
+    }
+    const ScriptVm& vm                       = VmOf(state);
+    const ComponentInfo& info                = vm.GetWorld().GetMessages().GetInfo(type);
+    const ecs::SystemContext& system         = object.GetContext()->GetSystem();
+    const std::span<const EntityId> targets  = system.ReceivedTargets(type);
+    const std::span<const std::byte> payload = system.ReceivedBytes(type);
+    lua_newtable(state);
+    int count = 0;
+    for (size_t i = 0; i < targets.size(); ++i) {
+        if (targets[i].IsValid() && targets[i] != object.GetOwner()) {
+            continue;
+        }
+        PushRecord(state, vm, info, payload.data() + (i * info.mSize));
+        lua_rawseti(state, -2, ++count);
+    }
+    return 1;
+}
+
+/// ctx.send(type, target | nil, table)   (declared send; nil target broadcasts)
+int CtxSend(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    const MessageTypeIndex type       = CheckMessage(state, 1);
+    if (!object.GetScriptType().GetSends().Test(type) || !object.GetContext()->GetSystem().CanSend(type)) {
+        luaL_error(state, "oyi: ctx.send: the message type is not declared in sends");
+    }
+    const ScriptVm& vm        = VmOf(state);
+    const EntityId target     = lua_isnoneornil(state, 2) ? EntityId::Invalid() : CheckEntity(state, 2);
+    const ComponentInfo& info = vm.GetWorld().GetMessages().GetInfo(type);
+    std::array<std::byte, kRecordBufferSize> buffer{};
+    BuildRecord(state, vm, info, nullptr, 3, buffer);
+    object.GetContext()->GetSystem().SendBytes(type, target, buffer.data(), info.mSize);
+    return 0;
+}
+
+/// ctx.owner() -> entity
+int CtxOwner(lua_State* state) {
+    PushEntity(state, ObjectOf(state).GetOwner());
+    return 1;
+}
+
+/// ctx.env() -> { frame, tick, fixed_step, time, delta }   (the managed system must declare it)
+int CtxEnv(lua_State* state) {
+    const ScriptManagedObject& object = ObjectOf(state);
+    if (!object.GetContext()->GetSystem().CanReadResource(ecs::kEnvironmentResource)) {
+        luaL_error(state, "oyi: ctx.env: the managed system does not read the Environment");
+    }
+    return Env(state);
+}
+
+constexpr std::array<luaL_Reg, 8> kContextLibrary{{{.name = "get", .func = &CtxGet},
+                                                   {.name = "prev", .func = &CtxPrev},
+                                                   {.name = "set", .func = &CtxSet},
+                                                   {.name = "received", .func = &CtxReceived},
+                                                   {.name = "send", .func = &CtxSend},
+                                                   {.name = "owner", .func = &CtxOwner},
+                                                   {.name = "env", .func = &CtxEnv},
+                                                   {.name = nullptr, .func = nullptr}}};
+
+constexpr std::array<luaL_Reg, 20> kLibrary{{{.name = "component", .func = &Component},
                                              {.name = "message", .func = &Message},
                                              {.name = "managed", .func = &Managed},
+                                             {.name = "managed_type", .func = &ManagedType},
                                              {.name = "state", .func = &State},
                                              {.name = "set_state", .func = &SetState},
                                              {.name = "is_alive", .func = &IsAlive},
@@ -596,6 +786,18 @@ constexpr std::array<luaL_Reg, 19> kLibrary{{{.name = "component", .func = &Comp
                                              {.name = nullptr, .func = nullptr}}};
 
 } // namespace
+
+void PushManagedContext(lua_State* state, ScriptManagedObject& object) {
+    lua_createtable(state, 0, static_cast<int>(kContextLibrary.size() - 1));
+    for (const luaL_Reg& entry : kContextLibrary) {
+        if (entry.name == nullptr) {
+            break;
+        }
+        lua_pushlightuserdata(state, &object);
+        lua_pushcclosure(state, entry.func, entry.name, 1);
+        lua_setfield(state, -2, entry.name);
+    }
+}
 
 void OpenOyiLibrary(lua_State* state, ScriptVm& vm) noexcept {
     lua_callbacks(state)->userdata = &vm;
