@@ -20,6 +20,7 @@
 
 namespace oyi::ecs {
 
+class FirewallWindow;
 class World;
 
 /// Managed components (ADR-0006): the chunk holds a handle, the object lives on the heap and has
@@ -85,6 +86,11 @@ public:
     virtual ~ManagedObject()                       = default;
 
     virtual void Update(class ManagedContext& context) = 0;
+    /// ADR-0024 lifecycle, called by the object layer inside the sync hook (main thread, world
+    /// still): after the owner and every entity spawned at the same sync point exist, and before
+    /// the owner is destroyed (it is alive for one more sync point).
+    virtual void OnSpawned(FirewallWindow& /*window*/) {}
+    virtual void OnDespawning(FirewallWindow& /*window*/) {}
     /// After the object was rebuilt from a world file and its state block restored: fill in
     /// run-time members. The world is complete and static.
     virtual void OnLoaded(World& /*world*/) {}
@@ -178,6 +184,11 @@ public:
         return Adopt(object, owner);
     }
 
+    /// Takes ownership of an object allocated with GetAllocator() (a type factory's product) and
+    /// binds it to `owner`.
+    [[nodiscard]] core::Expected<ManagedId> Adopt(ManagedObject* object, EntityId owner) noexcept;
+    [[nodiscard]] core::Allocator& GetAllocator() const noexcept { return mAllocator; }
+
     /// Places an object rebuilt from a world file at exactly `id` (World::Load). The slot must be
     /// free; the generation is taken from the id so handles in chunks keep resolving.
     [[nodiscard]] core::Result Restore(ManagedId id, ManagedObject* object, EntityId owner) noexcept;
@@ -230,7 +241,6 @@ private:
         uint32_t mGeneration   = 1;
     };
 
-    [[nodiscard]] core::Expected<ManagedId> Adopt(ManagedObject* object, EntityId owner) noexcept;
     void Release(uint32_t index) noexcept;
 
     core::Allocator& mAllocator;

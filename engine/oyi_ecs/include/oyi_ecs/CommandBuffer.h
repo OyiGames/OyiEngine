@@ -14,6 +14,14 @@
 
 namespace oyi::ecs {
 
+class World;
+
+/// Runs at replay for a Call command, once the target exists and is alive: `data` is what was
+/// recorded with the command, `payload` the bytes copied at recording time. The world stands
+/// still; the callback may read it and keep notes, the usual way for a layer above the kernel
+/// to learn which entities a sync point materialised (ADR-0024: the object layer).
+using CommandCallback = void (*)(World& world, EntityId target, void* data, std::span<const std::byte> payload);
+
 /// An entity created in a CommandBuffer, usable by later commands in the same buffer. It becomes a
 /// real EntityId only when the buffer is replayed at a sync point (ADR-0008).
 struct PendingEntity {
@@ -78,6 +86,17 @@ public:
     /// object is untyped or `size` is not the state size.
     void WriteManagedState(EntityId owner, ManagedId id, const void* data, uint32_t size) noexcept;
 
+    /// Writes the EntityId `referenced` becomes at replay into the target's component `type` at
+    /// byte `offset` (a handle field: a parent link, an owner). Skipped when the target lacks the
+    /// component, the field does not fit, or the referenced creation failed.
+    void LinkEntity(EntityId target, ComponentTypeIndex type, uint32_t offset, PendingEntity referenced) noexcept;
+    void LinkEntity(PendingEntity target, ComponentTypeIndex type, uint32_t offset, PendingEntity referenced) noexcept;
+
+    /// Calls `function(world, target, data, payload)` at replay, in command order, if the target
+    /// is alive then; `size` payload bytes are copied now.
+    void Call(EntityId target, CommandCallback function, void* data, const void* payload, uint32_t size) noexcept;
+    void Call(PendingEntity target, CommandCallback function, void* data, const void* payload, uint32_t size) noexcept;
+
     [[nodiscard]] bool IsEmpty() const noexcept { return mCommands.empty(); }
     [[nodiscard]] uint32_t GetCommandCount() const noexcept { return static_cast<uint32_t>(mCommands.size()); }
     [[nodiscard]] uint32_t GetCreateCount() const noexcept { return static_cast<uint32_t>(mCreateMasks.size()); }
@@ -87,7 +106,13 @@ public:
 private:
     friend class World;
 
-    enum class Op : uint8_t { Create, Clone, Destroy, Add, Remove, Set, Enable, Mark, ManagedState };
+    enum class Op : uint8_t { Create, Clone, Destroy, Add, Remove, Set, Enable, Mark, ManagedState, Link, Call };
+
+    /// Leads the payload of a Call command.
+    struct CallHeader {
+        CommandCallback mFunction = nullptr;
+        void* mData               = nullptr;
+    };
 
     struct Command {
         uint64_t mSortKey = 0;
@@ -96,8 +121,9 @@ private:
         EntityMark mMark  = EntityMark::None; ///< Mark: the new mark
         ManagedId mManaged{};                 ///< ManagedState: the object
         ComponentTypeIndex mType;
-        EntityId mEntity;       ///< target when mPending is invalid; Clone: the source
-        PendingEntity mPending; ///< target created earlier in this buffer; Create / Clone: the slot it fills
+        EntityId mEntity;         ///< target when mPending is invalid; Clone: the source
+        PendingEntity mPending;   ///< target created earlier in this buffer; Create / Clone: the slot it fills
+        PendingEntity mReference; ///< Link: the entity whose id is written
         uint32_t mPayloadOffset = 0;
         uint32_t mPayloadSize   = 0;
     };
@@ -105,6 +131,8 @@ private:
     void Record(Op op, ComponentTypeIndex type, EntityId entity, PendingEntity pending, uint32_t payloadOffset,
                 uint32_t payloadSize, bool flag) noexcept;
     [[nodiscard]] uint32_t StorePayload(const void* data, uint32_t size) noexcept;
+    void RecordCall(EntityId entity, PendingEntity pending, CommandCallback function, void* data, const void* payload,
+                    uint32_t size) noexcept;
 
     core::MemoryResource mResource;
     std::pmr::vector<Command> mCommands;

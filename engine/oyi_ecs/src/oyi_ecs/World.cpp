@@ -384,6 +384,30 @@ World::ReplayStats World::ReplayCommands(std::span<CommandBuffer* const> buffers
         case CommandBuffer::Op::Mark:
             applied = SetMark(target, command.mMark).has_value();
             break;
+        case CommandBuffer::Op::Link: {
+            const EntityId referenced =
+                command.mReference.IsValid() ? created[ref.mBuffer][command.mReference.mIndex] : EntityId::Invalid();
+            void* const component = GetComponentForWrite(target, command.mType);
+            if (referenced.IsValid() && component != nullptr &&
+                static_cast<size_t>(command.mPayloadOffset) + sizeof(EntityId) <=
+                    mComponents.GetInfo(command.mType).mSize) {
+                std::memcpy(static_cast<std::byte*>(component) + command.mPayloadOffset, &referenced, sizeof(EntityId));
+                applied = true;
+            }
+            break;
+        }
+        case CommandBuffer::Op::Call: {
+            CommandBuffer::CallHeader header;
+            std::memcpy(&header, buffer.mPayload.data() + command.mPayloadOffset, sizeof(header));
+            if (header.mFunction != nullptr) {
+                header.mFunction(
+                    *this, target, header.mData,
+                    std::span<const std::byte>{buffer.mPayload.data() + command.mPayloadOffset + sizeof(header),
+                                               command.mPayloadSize - sizeof(header)});
+                applied = true;
+            }
+            break;
+        }
         case CommandBuffer::Op::ManagedState: {
             ManagedObject* const object = mManaged.Resolve(command.mManaged);
             if (object != nullptr && object->GetTypeInfo() != nullptr && object->GetOwner() == target &&

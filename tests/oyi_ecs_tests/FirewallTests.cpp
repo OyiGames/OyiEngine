@@ -216,6 +216,24 @@ private:
     const Types& mTypes;
 };
 
+/// A sync hook that creates an entity on its first run and counts the rest.
+struct Hook {
+    Fixture* mFixture = nullptr;
+    uint32_t mRuns    = 0;
+    uint32_t mSeen    = 0; ///< entities with Health when the hook last ran
+};
+
+void OnSync(FirewallWindow& window) {
+    auto* const self = window.GetData<Hook>();
+    if (self->mRuns++ == 0) {
+        const PendingEntity born = window.CreateEntity(MaskOf({self->mFixture->mTypes.mHealth}));
+        window.Set(born, self->mFixture->mTypes.mHealth, Health{.mCurrent = 7, .mMax = 7, .mLastAttacker = {}});
+    }
+    self->mSeen = 0;
+    window.ForEachEntity(MaskOf({self->mFixture->mTypes.mHealth}), ComponentMask{},
+                         [self](EntityId) { ++self->mSeen; });
+}
+
 struct Pushers {
     Fixture* mFixture = nullptr;
     EntityId mDriven;
@@ -388,4 +406,37 @@ TEST_CASE("frames with a window match between the serial and the parallel run", 
     const auto parallel = simulate(true);
     CHECK(serial.size() == 1200);
     CHECK(serial == parallel);
+}
+
+TEST_CASE("the sync hook opens after every sync point and its records apply before anything else runs",
+          "[ecs][firewall][schedule][object]") {
+    Fixture f;
+    f.AddMovement();
+    REQUIRE(f.mSchedule.Build().has_value());
+    Hook hook;
+    hook.mFixture = &f;
+    f.mSchedule.SetSyncHook(&OnSync, &hook);
+    (void)f.Spawn(1.0f); // has Health too
+
+    // The phase's sync point opens the hook; what the hook recorded is live right after.
+    REQUIRE(f.mSchedule.RunPhaseSerial(Phase::Variable).has_value());
+    CHECK(hook.mRuns == 1);
+    CHECK(hook.mSeen == 1); // the hook's own entity is not there while it runs
+    CHECK(f.mSchedule.GetSyncHookRunCount() == 1);
+    CHECK(f.mWorld.GetEntityCount() == 2);
+    // The hook's replay does not open the hook again; an explicit window does, after its own sync point.
+    Observation seen;
+    seen.mFixture = &f;
+    seen.mEntity  = f.Spawn(0.0f);
+    REQUIRE(f.mSchedule.RunWindow(&Observe, &seen).has_value());
+    CHECK(hook.mRuns == 2);
+    CHECK(hook.mSeen == 3);
+    // A per-phase window: the phase's sync point, then the window's.
+    f.mSchedule.SetWindow(Phase::Variable, &Observe, &seen);
+    JobSystem jobs(f.mAllocator, kThreeWorkers);
+    REQUIRE(f.mSchedule.RunPhase(Phase::Variable, jobs).has_value());
+    CHECK(hook.mRuns == 4);
+    f.mSchedule.SetSyncHook(nullptr, nullptr);
+    REQUIRE(f.mSchedule.RunPhaseSerial(Phase::Variable).has_value());
+    CHECK(hook.mRuns == 4);
 }

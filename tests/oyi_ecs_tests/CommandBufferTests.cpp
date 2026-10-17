@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <initializer_list>
@@ -47,6 +48,24 @@ struct Fixture {
         mask.Set(type);
     }
     return mask;
+}
+
+/// What a Call command's callback saw.
+struct CallLog {
+    std::vector<EntityId> mTargets;
+    std::vector<uint8_t> mBytes;
+    uint32_t mAlive = 0;
+};
+
+// The signature is CommandCallback's; the world is only read.
+void OnCall(World& world, EntityId target, void* data,
+            std::span<const std::byte> payload) { // NOLINT(misc-const-correctness)
+    auto* const log = static_cast<CallLog*>(data);
+    log->mTargets.push_back(target);
+    log->mAlive += world.IsAlive(target) ? 1 : 0;
+    for (const std::byte byte : payload) {
+        log->mBytes.push_back(static_cast<uint8_t>(byte));
+    }
 }
 
 } // namespace
@@ -283,4 +302,34 @@ TEST_CASE("clones and marks replay like any other command", "[ecs][commands][obj
     CHECK(f.mWorld.GetMark(plain) == EntityMark::Locked);
     CHECK_FALSE(f.mWorld.HasComponent(plain, f.mVelocity));
     CHECK(f.mWorld.GetEntityCount() == 3); // prototype, plain, instance
+}
+
+TEST_CASE("link and call commands resolve pending entities at replay", "[ecs][commands][object]") {
+    Fixture f;
+    const EntityId dead = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    REQUIRE(f.mWorld.DestroyEntity(dead).has_value());
+    CommandBuffer commands(f.mAllocator);
+    CallLog log;
+    const PendingEntity owner = commands.CreateEntity(MaskOf({f.mPosition}));
+    const PendingEntity child = commands.CreateEntity(MaskOf({f.mPosition, f.mHealth}));
+    commands.LinkEntity(child, f.mHealth, static_cast<uint32_t>(offsetof(Health, mLastAttacker)), owner);
+    commands.LinkEntity(child, f.mHealth, sizeof(Health) - 2, owner); // does not fit: skipped
+    commands.LinkEntity(owner, f.mHealth, 0, child);                  // owner has no Health: skipped
+    const std::array<uint8_t, 3> note{7, 8, 9};
+    commands.Call(child, &OnCall, &log, note.data(), static_cast<uint32_t>(note.size()));
+    commands.Call(owner, &OnCall, &log, nullptr, 0);
+    commands.Call(dead, &OnCall, &log, note.data(), 1); // dead target: skipped
+    commands.DestroyEntity(dead);                       // dead already: skipped
+
+    const std::array<CommandBuffer*, 1> buffers{&commands};
+    const World::ReplayStats stats = f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(stats.mApplied == 5);
+    CHECK(stats.mSkipped == 4);
+    REQUIRE(log.mTargets.size() == 2);
+    CHECK(log.mAlive == 2);
+    CHECK(f.mWorld.HasComponent(log.mTargets[0], f.mHealth));
+    CHECK(f.mWorld.Get<Health>(log.mTargets[0])->mLastAttacker == log.mTargets[1]);
+    CHECK(f.mWorld.Get<Health>(log.mTargets[0])->mCurrent == 100); // the bad link touched nothing
+    CHECK(log.mBytes == std::vector<uint8_t>{7, 8, 9});
+    CHECK(f.mWorld.GetEntityCount() == 2);
 }

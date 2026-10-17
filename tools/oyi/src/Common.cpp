@@ -1,4 +1,5 @@
 #include <oyi_core/Version.h>
+#include <oyi_object/Components.gen.h>  // IWYU pragma: keep
 #include <oyi_physics/Components.gen.h> // IWYU pragma: keep
 #include <oyi_rpc/Rpc.h>
 #include <oyi_transform/Components.gen.h> // IWYU pragma: keep
@@ -99,7 +100,8 @@ bool ReadFile(std::string_view path, std::vector<std::byte>& out, std::string& e
 unsigned long long GetBuildSchemaHash() noexcept {
     // Boost-style combination: the order of the modules is part of the hash.
     unsigned long long hash = 0;
-    for (const unsigned long long part : {oyi::transform::kSchemaHash, oyi::physics::kSchemaHash}) {
+    for (const unsigned long long part :
+         {oyi::transform::kSchemaHash, oyi::object::kSchemaHash, oyi::physics::kSchemaHash}) {
         hash ^= part + 0x9E37'79B9'7F4A'7C15ull + (hash << 6u) + (hash >> 2u);
     }
     return hash;

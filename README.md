@@ -42,7 +42,7 @@ scripts/                                 convention checks run by CI
 docs/                                    CONTRIBUTING, THIRD_PARTY (English + zh-CN)
 ```
 
-Module dependencies only point downwards: `platform <- core <- job <- ecs <- transform <- script / physics / net`.
+Module dependencies only point downwards: `platform <- core <- job <- ecs <- transform / object <- script / physics / net`.
 
 ## License
 
