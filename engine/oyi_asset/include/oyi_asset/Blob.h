@@ -19,7 +19,8 @@ namespace oyi::asset {
 /// schema hash and the baker's version so a stale file is caught before it is trusted.
 
 inline constexpr std::array<char, 4> kBlobMagic{'O', 'Y', 'I', 'B'};
-inline constexpr uint32_t kBlobFormatVersion = 1;
+/// 0 while the engine is 0.x: no compatibility promise for baked files; 1 with the first release.
+inline constexpr uint32_t kBlobFormatVersion = 0;
 /// The payload starts at this offset and every blob should be loaded with this alignment.
 inline constexpr size_t kBlobAlignment = 64;
 
