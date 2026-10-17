@@ -15,6 +15,7 @@ void PrintUsage() {
                "       oyi world  inspect <file.oyiw> [--json]\n"
                "       oyi asset  inspect <file.oyib> [--json]\n"
                "       oyi schema validate <header.h> [--json]\n"
+               "       oyi schema dump [--json]\n"
                "       oyi serve  --rpc [--port=N] [--once] [--json]\n",
                stdout);
 }

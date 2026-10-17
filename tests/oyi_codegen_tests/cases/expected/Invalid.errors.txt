@@ -1,6 +1,6 @@
 Invalid.h:17:23: error: [OYI-C001] annotated declaration must be a 'struct' at namespace scope
 Invalid.h:22:1: error: [OYI-C006] 5 byte(s) of implicit tail padding in 'BadOptions'; add 'std::uint8_t mPad[5] = {};' as the last field
-Invalid.h:22:30: error: [OYI-C012] unknown option 'Flying'; allowed: ['Chunk', 'Predicted', 'Replicated', 'Tag']
+Invalid.h:22:30: error: [OYI-C012] unknown option 'Flying'; allowed: ['Chunk', 'Description', 'Predicted', 'ReadOnly', 'Replicated', 'Tag', 'Transient']
 Invalid.h:22:43: error: [OYI-C002] base classes are not allowed
 Invalid.h:23:20: error: [OYI-C004] field 'mPlainInt' has type 'int'; use a fixed-width integer (std::int32_t, std::uint8_t, ...)
 Invalid.h:24:20: error: [OYI-C004] field 'mPointer' has type 'std::uint64_t *' which is not allowed; components store handles (oyi::core::Handle<Tag>), never pointers or references
@@ -11,7 +11,7 @@ Invalid.h:27:20: error: [OYI-C007] field 'mBits' is a bit-field; use explicit ma
 Invalid.h:28:1: error: [OYI-C006] 1 byte(s) of implicit padding before field 'mQuantizedInt'; add 'std::uint8_t mPad[1] = {};' or reorder fields
 Invalid.h:28:44: error: [OYI-C013] field 'mQuantizedInt': Quantize only applies to float and double fields
 Invalid.h:29:1: error: [OYI-C006] 2 byte(s) of implicit padding before field 'mUnknownOption'; add 'std::uint8_t mPad[2] = {};' or reorder fields
-Invalid.h:29:27: error: [OYI-C012] unknown option 'Loud'; allowed: ['Hidden', 'Quantize', 'Replicated']
+Invalid.h:29:27: error: [OYI-C012] unknown option 'Loud'; allowed: ['Asset', 'Description', 'Hidden', 'Quantize', 'Range', 'ReadOnly', 'Replicated', 'Step', 'Unit']
 Invalid.h:30:19: error: [OYI-C009] padding field 'mPadX' must be std::uint8_t or std::uint8_t[N]
 Invalid.h:31:19: error: [OYI-C016] field 'mPad': multi-dimensional arrays are not allowed
 Invalid.h:32:18: error: [OYI-C003] virtual functions are not allowed
@@ -25,3 +25,10 @@ Invalid.h:45:1: error: [OYI-C006] 2 byte(s) of implicit tail padding in 'Implici
 Invalid.h:47:1: error: [OYI-C006] 3 byte(s) of implicit padding before field 'mWide'; add 'std::uint8_t mPad[3] = {};' or reorder fields
 Invalid.h:51:27: error: [OYI-C008] a Tag component must not have fields
 Invalid.h:56:12: error: [OYI-C010] nested type declarations are not allowed; declare the type at namespace scope
+Invalid.h:62:45: error: [OYI-C021] a Transient component cannot be Replicated or Predicted
+Invalid.h:66:46: error: [OYI-C020] Description must be a double-quoted string
+Invalid.h:71:43: error: [OYI-C019] field 'mNotAnAsset': Asset only applies to oyi::core::AssetId fields
+Invalid.h:72:34: error: [OYI-C018] field 'mRangeOnBool': Range only applies to numeric fields
+Invalid.h:74:35: error: [OYI-C018] field 'mInverted': Range min must not exceed max
+Invalid.h:75:32: error: [OYI-C018] field 'mNegativeStep': Step must be positive
+Invalid.h:76:42: error: [OYI-C020] field 'mBareDescription': Description must be a double-quoted string

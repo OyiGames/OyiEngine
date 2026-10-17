@@ -50,6 +50,11 @@ function(oyi_add_module name)
             list(APPEND relative_headers "${relative}")
         endforeach()
         oyi_target_codegen(${target} INCLUDE_ROOT "${include_root}" HEADERS ${relative_headers})
+        # SDK modules contribute to the build's merged schema (oyi_schema.json, ADR-0024); fixtures do not.
+        if(NOT ARG_NO_INSTALL)
+            set_property(GLOBAL APPEND PROPERTY OYI_SDK_SCHEMA_JSON ${OYI_CODEGEN_JSON_FILES})
+            set_property(GLOBAL APPEND PROPERTY OYI_SDK_SCHEMA_TARGETS ${target})
+        endif()
     endif()
 
     if(NOT ARG_NO_INSTALL)

@@ -16,6 +16,10 @@ Rules (error codes are stable; grep for them in docs and tests):
   OYI-C013 Quantize only applies to float and double fields
   OYI-C016 multi-dimensional arrays are not allowed
   OYI-C017 enum fields must be `enum class` with a fixed-width underlying type
+  OYI-C018 Range / Step only apply to numeric fields; Range is `<min>..<max>` with min <= max, Step is positive
+  OYI-C019 Asset only applies to oyi::core::AssetId fields
+  OYI-C020 Description (and Unit with spaces) must be a double-quoted string
+  OYI-C021 a Transient component cannot be Replicated or Predicted
   OYI-P001 clang reported an error while parsing
 """
 
@@ -29,6 +33,7 @@ from oyi_codegen.model import (
     COMPONENT_OPTIONS,
     FIELD_OPTIONS,
     STRUCT_OPTIONS,
+    VALUE_OPTIONS,
     Diagnostic,
     FieldDecl,
     FieldKind,
@@ -38,7 +43,20 @@ from oyi_codegen.model import (
 
 _FIXED_WIDTH = re.compile(r"^(?:std::)?(u?)int(8|16|32|64)_t$")
 _PADDING_NAME = re.compile(r"^mPad[A-Za-z0-9]*$")
-_KNOWN_VALUE_TYPES = ("oyi::core::Handle<", "oyi::core::TypeId")
+_KNOWN_VALUE_TYPES = ("oyi::core::Handle<", "oyi::core::TypeId", "oyi::core::AssetId")
+_ASSET_ID_TYPE = "oyi::core::AssetId"
+_NUMERIC_KINDS = {
+    FieldKind.INT8,
+    FieldKind.UINT8,
+    FieldKind.INT16,
+    FieldKind.UINT16,
+    FieldKind.INT32,
+    FieldKind.UINT32,
+    FieldKind.INT64,
+    FieldKind.UINT64,
+    FieldKind.FLOAT32,
+    FieldKind.FLOAT64,
+}
 
 _ANNOTATION_PREFIXES = {
     "oyi.component:": "component",
@@ -79,10 +97,45 @@ def _namespace_of(cursor) -> tuple[str, ...]:
     return tuple(reversed(parts))
 
 
+def _split_options(text: str) -> list[str]:
+    """Splits on commas that are not inside double quotes."""
+    items: list[str] = []
+    current: list[str] = []
+    quoted = False
+    escaped = False
+    for ch in text:
+        if escaped:
+            current.append(ch)
+            escaped = False
+        elif ch == "\\" and quoted:
+            current.append(ch)
+            escaped = True
+        elif ch == '"':
+            current.append(ch)
+            quoted = not quoted
+        elif ch == "," and not quoted:
+            items.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    items.append("".join(current))
+    return items
+
+
+def unquote(value: str | None) -> str | None:
+    """The text inside a double-quoted option value (backslash escapes resolved), or None."""
+    if value is None or len(value) < 2 or value[0] != '"' or value[-1] != '"':
+        return None
+    inner = value[1:-1]
+    return inner.replace('\\"', '"').replace("\\\\", "\\")
+
+
 def parse_options(text: str, allowed: set[str], where: Diagnostic, out: list[Diagnostic]) -> dict[str, str | None]:
-    """'Tag, Quantize = 0.01' -> {'Tag': None, 'Quantize': '0.01'}; unknown keys produce OYI-C012."""
+    """'Tag, Quantize = 0.01' -> {'Tag': None, 'Quantize': '0.01'}; unknown keys produce OYI-C012.
+
+    Values keep their quotes so that callers can tell a quoted string from a bare token."""
     options: dict[str, str | None] = {}
-    for raw in text.split(","):
+    for raw in _split_options(text):
         item = raw.strip()
         if not item:
             continue
@@ -102,6 +155,63 @@ def parse_options(text: str, allowed: set[str], where: Diagnostic, out: list[Dia
             continue
         options[key] = value
     return options
+
+
+def _initializer_expr(cursor):
+    """The field's default member initializer expression, or None. A constant array's size is an
+    expression child too, so for arrays the initializer is the second expression child."""
+    import clang.cindex as ci
+
+    expressions = [c for c in cursor.get_children() if c.kind.is_expression()]
+    needed = 2 if cursor.type.kind == ci.TypeKind.CONSTANTARRAY else 1
+    return expressions[-1] if len(expressions) >= needed else None
+
+
+def _initializer_text(cursor) -> str | None:
+    """Source text of the field's default member initializer, without spaces; None when absent."""
+    expr = _initializer_expr(cursor)
+    return None if expr is None else "".join(t.spelling for t in expr.get_tokens())
+
+
+def _parse_scalar(text: str, kind: FieldKind) -> object:
+    if kind is FieldKind.BOOL:
+        return {"true": True, "false": False}.get(text)
+    if kind is FieldKind.ENUM:
+        return text.rsplit("::", 1)[-1] if text else None
+    if kind in (FieldKind.FLOAT32, FieldKind.FLOAT64):
+        try:
+            return float(text.rstrip("fFlL"))
+        except ValueError:
+            return None
+    if kind in _NUMERIC_KINDS:
+        try:
+            return int(text.rstrip("uUlL"), 0)
+        except ValueError:
+            return None
+    return None
+
+
+def _default_value(cursor, kind: FieldKind) -> object:
+    """The default member initializer as a JSON value: scalars, enumerator names, and arrays of
+    those. Struct and handle values, designated initializers and anything else are left out."""
+    text = _initializer_text(cursor)
+    if text is None or kind is FieldKind.STRUCT:
+        return None
+    if text.startswith("{") and text.endswith("}"):
+        inner = text[1:-1]
+        if not inner:
+            return None  # value-initialized: the kind's zero, which the reader already knows
+        items = [_parse_scalar(part, kind) for part in inner.split(",")]
+        return items if all(item is not None for item in items) else None
+    return _parse_scalar(text, kind)
+
+
+def _enumerators(elem) -> tuple[dict[str, int], str]:
+    import clang.cindex as ci
+
+    enum_decl = elem.get_canonical().get_declaration()
+    values = {c.spelling: c.enum_value for c in enum_decl.get_children() if c.kind == ci.CursorKind.ENUM_CONSTANT_DECL}
+    return values, enum_decl.enum_type.spelling
 
 
 class _RecordAnalyzer:
@@ -132,7 +242,7 @@ class _RecordAnalyzer:
             namespace=_namespace_of(cursor),
             name=cursor.spelling,
             kind=kind,
-            flags=sorted(options),
+            flags=sorted(k for k in options if k not in VALUE_OPTIONS),
             size=cursor.type.get_size(),
             align=cursor.type.get_align(),
             line=cursor.location.line,
@@ -140,6 +250,12 @@ class _RecordAnalyzer:
         if record.size < 0:
             self.error(cursor, "OYI-C001", "struct is incomplete or dependent; its layout is unknown")
             return None
+        if "Description" in options:
+            text_value = unquote(options["Description"])
+            if text_value is None:
+                self.error(cursor, "OYI-C020", "Description must be a double-quoted string")
+            else:
+                record.description = text_value
 
         replicate_all = "Replicated" in options
         for child in cursor.get_children():
@@ -178,6 +294,8 @@ class _RecordAnalyzer:
         if any(f.is_padding is False and "Replicated" in f.flags for f in record.fields):
             if "Replicated" not in record.flags:
                 record.flags = sorted([*record.flags, "Replicated"])
+        if "Transient" in record.flags and ("Replicated" in record.flags or "Predicted" in record.flags):
+            self.error(cursor, "OYI-C021", "a Transient component cannot be Replicated or Predicted")
         record.type_id = hashing.type_id(record.qualified_name)
         record.layout_hash = hashing.layout_hash(record)
         return record
@@ -198,7 +316,7 @@ class _RecordAnalyzer:
                 option_text = ann[len("oyi.field:") :]
         options = parse_options(option_text, FIELD_OPTIONS, here, self.out)
 
-        has_initializer = any(c.kind.is_expression() for c in cursor.get_children())
+        has_initializer = _initializer_expr(cursor) is not None
         if not has_initializer:
             self.error(cursor, "OYI-C005", f"field '{cursor.spelling}' has no default member initializer")
 
@@ -242,6 +360,12 @@ class _RecordAnalyzer:
             decl.flags.append("Replicated")
         if "Hidden" in options:
             decl.flags.append("Hidden")
+        if "ReadOnly" in options:
+            decl.flags.append("ReadOnly")
+        self.apply_tool_options(cursor, decl, elem, kind, options)
+        decl.default = _default_value(cursor, kind)
+        if kind is FieldKind.ENUM:
+            decl.enumerators, decl.enum_underlying = _enumerators(elem)
         if "Quantize" in options:
             value = options["Quantize"]
             if kind not in (FieldKind.FLOAT32, FieldKind.FLOAT64):
@@ -254,6 +378,61 @@ class _RecordAnalyzer:
                 if decl.quantize <= 0.0:
                     self.error(cursor, "OYI-C012", f"field '{decl.name}': Quantize must be positive")
         return decl
+
+    def apply_tool_options(
+        self, cursor, decl: FieldDecl, elem, kind: FieldKind, options: dict[str, str | None]
+    ) -> None:
+        """Range, Step, Unit, Asset and Description (ADR-0024): validated here, consumed by tools."""
+        if "Range" in options:
+            value = options["Range"] or ""
+            low, sep, high = value.partition("..")
+            if kind not in _NUMERIC_KINDS:
+                self.error(cursor, "OYI-C018", f"field '{decl.name}': Range only applies to numeric fields")
+            elif not sep:
+                self.error(cursor, "OYI-C018", f"field '{decl.name}': Range must be '<min>..<max>', got '{value}'")
+            else:
+                try:
+                    decl.range_min = float(low.strip().rstrip("fF"))
+                    decl.range_max = float(high.strip().rstrip("fF"))
+                except ValueError:
+                    self.error(cursor, "OYI-C018", f"field '{decl.name}': Range needs two numbers, got '{value}'")
+                    decl.range_min = decl.range_max = None
+                if decl.range_min is not None and decl.range_max is not None and decl.range_min > decl.range_max:
+                    self.error(cursor, "OYI-C018", f"field '{decl.name}': Range min must not exceed max")
+        if "Step" in options:
+            value = options["Step"] or ""
+            if kind not in _NUMERIC_KINDS:
+                self.error(cursor, "OYI-C018", f"field '{decl.name}': Step only applies to numeric fields")
+            else:
+                try:
+                    decl.step = float(value.rstrip("fF"))
+                except ValueError:
+                    self.error(cursor, "OYI-C018", f"field '{decl.name}': Step needs a number, got '{value}'")
+                if decl.step <= 0.0:
+                    self.error(cursor, "OYI-C018", f"field '{decl.name}': Step must be positive")
+        if "Unit" in options:
+            value = options["Unit"] or ""
+            text_value = unquote(value)
+            if text_value is None and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_/]*", value):
+                text_value = value
+            if text_value is None:
+                self.error(cursor, "OYI-C020", f"field '{decl.name}': Unit must be a name or a double-quoted string")
+            else:
+                decl.unit = text_value
+        if "Asset" in options:
+            value = options["Asset"] or ""
+            if elem.get_canonical().spelling != _ASSET_ID_TYPE:
+                self.error(cursor, "OYI-C019", f"field '{decl.name}': Asset only applies to {_ASSET_ID_TYPE} fields")
+            elif not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+                self.error(cursor, "OYI-C012", f"field '{decl.name}': Asset needs a kind name, got '{value}'")
+            else:
+                decl.asset_kind = value
+        if "Description" in options:
+            text_value = unquote(options["Description"])
+            if text_value is None:
+                self.error(cursor, "OYI-C020", f"field '{decl.name}': Description must be a double-quoted string")
+            else:
+                decl.description = text_value
 
     def classify(self, cursor, elem, decl: FieldDecl) -> FieldKind | None:
         """Maps a field element type to a FieldKind, enforcing the whitelist (OYI-C004)."""

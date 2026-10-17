@@ -41,9 +41,15 @@ struct OYI_COMPONENT(Tag) Dead {};
 
 | Annotation | Options |
 |---|---|
-| `OYI_COMPONENT(...)` | `Tag` (no data), `Replicated` (all fields), `Chunk` (one value per chunk) |
-| `OYI_STRUCT()` | none; marks a value type that components may embed |
-| `OYI_FIELD(...)` | `Replicated`, `Hidden`, `Quantize = <step>` (float and double only) |
+| `OYI_COMPONENT(...)` | `Tag` (no data), `Replicated` (all fields), `Chunk` (one value per chunk), `Predicted` (client prediction history), `Transient` (rebuilt at run time: saved as defaults, never replicated or predicted), `ReadOnly` (derived by systems; tools only display it), `Description = "..."` |
+| `OYI_STRUCT(...)` | marks a value type that components may embed; `Description = "..."` |
+| `OYI_FIELD(...)` | `Replicated`, `Hidden`, `Quantize = <step>` (float and double only), `ReadOnly`, `Range = <min>..<max>` and `Step = <increment>` (numeric fields), `Unit = <name>` (a bare name such as `m`, or a quoted string such as `"m/s"`), `Asset = <Kind>` (the field must be an `oyi::core::AssetId`), `Description = "..."` |
+
+Option values containing spaces or commas go in double quotes (`\"` escapes a quote). `Description`, `Range`,
+`Step`, `Unit` and `Asset` are for tools (ADR-0024): they reach the runtime `FieldInfo` / `ComponentInfo` and the
+schema JSON but never change a layout. The schema JSON also records each field's default member initializer
+(`default`, for literals) and the enumerators of enum fields. The build merges every SDK module's schema JSON
+into `oyi_schema.json` (`python -m oyi_codegen merge`), which the `oyi` tool embeds (`oyi schema dump`).
 
 ## Rules
 
@@ -64,6 +70,10 @@ struct OYI_COMPONENT(Tag) Dead {};
 | OYI-C013 | `Quantize` only on `float` / `double` |
 | OYI-C016 | no multi-dimensional arrays |
 | OYI-C017 | enums must be `enum class` with a fixed-width underlying type |
+| OYI-C018 | `Range` / `Step` only on numeric fields; `Range` is `<min>..<max>` with min <= max, `Step` is positive |
+| OYI-C019 | `Asset` only on `oyi::core::AssetId` fields |
+| OYI-C020 | `Description` (and a `Unit` with spaces) must be a double-quoted string |
+| OYI-C021 | a `Transient` component cannot be `Replicated` or `Predicted` |
 | OYI-P001 | clang could not parse the header; reported on its own, no other rule runs |
 
 ## Command line

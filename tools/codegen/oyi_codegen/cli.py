@@ -3,6 +3,7 @@
     python -m oyi_codegen generate <include-relative header> --include-root DIR --out-dir DIR
                                    [--depfile FILE] [--libclang PATH] [-- <clang args>]
     python -m oyi_codegen validate <header path> [--json] [--luau] [--libclang PATH] [-- <clang args>]
+    python -m oyi_codegen merge --out oyi_schema.json [--cpp Embedded.cpp] <module schema.json>...
 
 Diagnostics are printed as `file:line:col: error: [OYI-Cnnn] message` so build systems and IDEs link them.
 Exit code 0 on success, 1 on validation errors, 2 on usage errors.
@@ -14,7 +15,7 @@ import argparse
 import os
 import sys
 
-from oyi_codegen import analyze, emit, frontend
+from oyi_codegen import analyze, emit, frontend, merge
 from oyi_codegen.model import Diagnostic
 
 
@@ -78,6 +79,14 @@ def cmd_validate(args: argparse.Namespace, clang_args: list[str]) -> int:
     return code
 
 
+def cmd_merge(args: argparse.Namespace, clang_args: list[str]) -> int:
+    if clang_args:
+        print("merge takes no clang arguments", file=sys.stderr)
+        return 2
+    merge.write_outputs(args.inputs, args.out, args.cpp)
+    return 0
+
+
 def main(argv: list[str]) -> int:
     own, clang_args = _split_clang_args(argv)
     ap = argparse.ArgumentParser(
@@ -99,6 +108,12 @@ def main(argv: list[str]) -> int:
     val.add_argument("--luau", action="store_true", help="print the Luau type definitions on success")
     val.add_argument("--libclang")
     val.set_defaults(func=cmd_validate)
+
+    mrg = sub.add_parser("merge", help="merge module schema JSON files into the build schema (ADR-0024)")
+    mrg.add_argument("inputs", nargs="+", help="<module>.schema.json files in dependency order")
+    mrg.add_argument("--out", required=True, help="merged JSON to write")
+    mrg.add_argument("--cpp", help="C++ source embedding the merged JSON (GetBuildSchemaJson)")
+    mrg.set_defaults(func=cmd_merge)
 
     try:
         args = ap.parse_args(own)

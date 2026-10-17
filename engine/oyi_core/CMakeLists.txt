@@ -10,6 +10,7 @@ oyi_add_module(core
     PUBLIC_HEADERS
         include/oyi_core/Allocator.h
         include/oyi_core/Annotations.h
+        include/oyi_core/AssetId.h
         include/oyi_core/Assert.h
         include/oyi_core/EnumFlags.h
         include/oyi_core/Expected.h

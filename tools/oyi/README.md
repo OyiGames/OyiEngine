@@ -16,6 +16,7 @@ on stdout, failures as `{"error":{"code":..,"message":..}}`) and `--quiet`. Exit
 | `oyi world inspect <file.oyiw> [--json]` | Header, component table and archetypes of a world saved with `World::Save`; no registry needed. |
 | `oyi asset inspect <file.oyib> [--json]` | Header of a baked blob after verifying magic, format, size and content hash. |
 | `oyi serve --rpc [--port=N] [--once] [--json]` | Listens on loopback for the editor / remote CLI / MCP channel (ADR-0015): length-prefixed FlatBuffers frames, handshake with protocol version, capabilities and auth, built-in `ping`, `version` and `echo`. `--once` exits after the first client leaves. |
+| `oyi schema dump [--json]` | The merged schema JSON of this build (`oyi_schema.json`: every SDK module's components, structs, enums and tool options, plus `buildSchemaHash`). The same text as the RPC `schema` command returns. |
 | `oyi schema validate <header.h> [--json]` | Runs tools/codegen's linter on a component header. Finds the generator, Python, libclang and the compiler arguments of this checkout; `OYI_CODEGEN_DIR`, `OYI_PYTHON`, `OYI_LIBCLANG` and `OYI_CODEGEN_ARGS_FILE` override. |
 
 Planned (ADR-0016): `world query | diff | snapshot | restore`, `sched graph --dot | validate`,

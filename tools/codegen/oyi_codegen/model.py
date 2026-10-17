@@ -23,9 +23,11 @@ class FieldKind(StrEnum):
     PADDING = "Padding"
 
 
-COMPONENT_OPTIONS = {"Tag", "Replicated", "Chunk", "Predicted"}
-FIELD_OPTIONS = {"Replicated", "Hidden", "Quantize"}
-STRUCT_OPTIONS: set[str] = set()
+COMPONENT_OPTIONS = {"Tag", "Replicated", "Chunk", "Predicted", "Transient", "ReadOnly", "Description"}
+FIELD_OPTIONS = {"Replicated", "Hidden", "Quantize", "ReadOnly", "Asset", "Range", "Step", "Unit", "Description"}
+STRUCT_OPTIONS = {"Description"}
+# Options that carry a value for tools rather than a flag; they never appear in `flags`.
+VALUE_OPTIONS = {"Quantize", "Asset", "Range", "Step", "Unit", "Description"}
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,16 @@ class FieldDecl:
     type_qualified: str = ""
     quantize: float = 0.0
     line: int = 0
+    # ADR-0024 tool-facing options.
+    range_min: float | None = None
+    range_max: float | None = None
+    step: float = 0.0
+    unit: str = ""
+    asset_kind: str = ""
+    description: str = ""
+    default: object = None  # JSON-ready value of the default member initializer, when it is a literal
+    enumerators: dict[str, int] | None = None  # for Enum fields: name -> value
+    enum_underlying: str = ""
 
     @property
     def is_padding(self) -> bool:
@@ -75,6 +87,7 @@ class RecordDecl:
     line: int = 0
     type_id: int = 0
     layout_hash: int = 0
+    description: str = ""
 
 
 @dataclass

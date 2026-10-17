@@ -70,6 +70,24 @@ TEST_CASE("every field kind is classified", "[codegen]") {
     REQUIRE(kHealthInfo.mFields[9].mSize == sizeof(double) * 4);
 }
 
+TEST_CASE("tool-facing options reach the runtime table", "[codegen]") {
+    REQUIRE(HasFlag(kScratchInfo.mFlags, ComponentFlags::Transient));
+    REQUIRE_FALSE(HasFlag(kScratchInfo.mFlags, ComponentFlags::Replicated));
+    REQUIRE(kScratchInfo.mDescription == "Rebuilt every frame");
+    REQUIRE(kHealthInfo.mDescription.empty());
+    const oyi::core::FieldInfo& blend = kScratchInfo.mFields[0];
+    REQUIRE(HasFlag(blend.mFlags, FieldFlags::HasRange));
+    REQUIRE(blend.mRangeMin == 0.0);
+    REQUIRE(blend.mRangeMax == 1.0);
+    REQUIRE(blend.mStep == 0.1f);
+    REQUIRE(blend.mUnit == "m");
+    REQUIRE(blend.mDescription == "Blend weight");
+    REQUIRE(HasFlag(kScratchInfo.mFields[1].mFlags, FieldFlags::ReadOnly));
+    REQUIRE(kScratchInfo.mFields[2].mAssetKind == "Mesh");
+    REQUIRE(kScratchInfo.mFields[2].mKind == FieldKind::Struct);
+    REQUIRE(kScratchInfo.mFields[2].mTypeId == oyi::core::MakeTypeId("oyi::core::AssetId"));
+}
+
 TEST_CASE("layout hash differs between components", "[codegen]") {
     REQUIRE(kPositionInfo.mLayoutHash != kHealthInfo.mLayoutHash);
     REQUIRE(kPositionInfo.mLayoutHash != 0);

@@ -4,6 +4,7 @@
 // Not part of the engine; see tests/oyi_codegen_tests.
 
 #include <oyi_core/Annotations.h>
+#include <oyi_core/AssetId.h>
 #include <oyi_core/Handle.h>
 
 #include <cstdint>
@@ -48,6 +49,13 @@ struct OYI_COMPONENT(Tag) Dead {};
 struct OYI_COMPONENT(Chunk) ChunkBounds {
     Vec3 mMin{};
     Vec3 mMax{};
+};
+
+/// Tool-facing options (ADR-0024): never replicated, saved as defaults, described for inspectors.
+struct OYI_COMPONENT(Transient, Description = "Rebuilt every frame") Scratch {
+    OYI_FIELD(Range = 0..1, Step = 0.1, Unit = m, Description = "Blend weight") float mBlend = 0.5f;
+    OYI_FIELD(ReadOnly) uint32_t mCache                                                      = 0;
+    OYI_FIELD(Asset = Mesh) oyi::core::AssetId mMesh {};
 };
 
 } // namespace oyi::codegen_sample

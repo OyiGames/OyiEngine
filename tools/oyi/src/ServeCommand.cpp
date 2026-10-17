@@ -39,7 +39,15 @@ void BuiltIn(void* /*data*/, const rpc::Request& request, rpc::Reply& reply) {
         reply.mPayload.assign(request.mPayload.begin(), request.mPayload.end());
         return;
     }
-    reply.Fail("NotFound", "unknown command; try ping, version or echo");
+    if (request.mCommand == "schema") {
+        const std::string_view json = GetBuildSchemaJson();
+        reply.mPayload.assign(
+            reinterpret_cast<const std::byte*>(json.data()), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            reinterpret_cast<const std::byte*>(json.data()) +
+                json.size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        return;
+    }
+    reply.Fail("NotFound", "unknown command; try ping, version, echo or schema");
 }
 
 } // namespace

@@ -51,6 +51,11 @@ struct OYI_COMPONENT(Predicted) NetPose {
     uint8_t mPad[2]                                 = {};
 };
 
+/// Rebuilt at run time (ADR-0024): a world file carries its defaults, never its values.
+struct OYI_COMPONENT(Transient) Scratch {
+    float mValue = 0.0f;
+};
+
 /// The chunk-side half of a managed Brain: a handle into the pool.
 struct OYI_COMPONENT() BrainRef {
     oyi::ecs::ManagedId mObject{};

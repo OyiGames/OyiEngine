@@ -102,6 +102,29 @@ def main(argv: list[str]) -> int:
         except (json.JSONDecodeError, KeyError):
             expect("asset inspect parse", False, result.stdout)
 
+    # schema dump: the embedded build schema, consistent with --version
+    result = run(args.oyi, "schema", "dump")
+    expect("schema dump exit", result.returncode == 0, result.stderr)
+    try:
+        merged = json.loads(result.stdout)
+        headers = [m["header"] for m in merged["modules"]]
+        expect(
+            "schema dump modules",
+            "oyi_transform/Components.h" in headers and "oyi_physics/Components.h" in headers,
+            str(headers),
+        )
+        version = json.loads(run(args.oyi, "--version", "--json").stdout)
+        expect(
+            "schema dump hash matches --version",
+            merged["buildSchemaHash"] == version["schemaHash"],
+            result.stdout[:200],
+        )
+        fields = [f for m in merged["modules"] for r in m["records"] for f in r["fields"]]
+        expect("schema dump defaults", any("default" in f for f in fields), "no field carries a default")
+    except (json.JSONDecodeError, KeyError) as exc:
+        expect("schema dump parse", False, repr(exc))
+    expect("schema dump --quiet is silent", run(args.oyi, "schema", "dump", "--quiet").stdout == "")
+
     # schema validate forwards to the generator
     result = run(args.oyi, "schema", "validate", os.path.join(args.cases, "Basic.h"))
     expect("schema validate ok", result.returncode == 0, result.stdout + result.stderr)

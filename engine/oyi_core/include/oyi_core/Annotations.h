@@ -9,9 +9,16 @@
 //   };
 //
 // Component options: Tag (no data), Replicated (fields are synchronized), Chunk (one per chunk),
-//                    Predicted (takes part in client prediction, ADR-0017).
-// Field options:     Replicated, Hidden (not shown in inspectors), Quantize = <step>.
-// OYI_STRUCT marks a plain value type (for example a vector) that components may embed.
+//                    Predicted (takes part in client prediction, ADR-0017),
+//                    Transient (rebuilt at run time: saved as defaults, never replicated),
+//                    ReadOnly (derived by systems; tools only display it),
+//                    Description = "..." (English, for tools; ADR-0024).
+// Field options:     Replicated, Hidden (not shown in inspectors), Quantize = <step>,
+//                    ReadOnly, Range = <min>..<max>, Step = <increment>, Unit = <name>,
+//                    Asset = <Kind> (the field must be an oyi::core::AssetId),
+//                    Description = "...".
+// OYI_STRUCT marks a plain value type (for example a vector) that components may embed; it takes
+// Description too. Option values with spaces or commas go in double quotes.
 
 #ifdef OYI_CODEGEN
 #define OYI_COMPONENT(...) [[clang::annotate("oyi.component:" #__VA_ARGS__)]]
