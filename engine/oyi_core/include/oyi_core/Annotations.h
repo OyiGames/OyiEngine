@@ -17,8 +17,9 @@
 //                    ReadOnly, Range = <min>..<max>, Step = <increment>, Unit = <name>,
 //                    Asset = <Kind> (the field must be an oyi::core::AssetId),
 //                    Description = "...".
-// OYI_STRUCT marks a plain value type (for example a vector) that components may embed; it takes
-// Description too. Option values with spaces or commas go in double quotes.
+// OYI_STRUCT marks a plain value type (for example a vector) that components may embed, or with
+// Message a record that travels as a message (ADR-0024); it takes Description too. Option values
+// with spaces or commas go in double quotes.
 
 #ifdef OYI_CODEGEN
 #define OYI_COMPONENT(...) [[clang::annotate("oyi.component:" #__VA_ARGS__)]]

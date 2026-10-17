@@ -44,9 +44,10 @@ struct ManagedBinding {
 struct PrototypeDesc {
     std::string_view mName;
     ecs::ComponentMask mMask; ///< ObjectInfo is added by the registry
-    std::span<const ComponentValue> mDefaults;
-    std::span<const ManagedBinding> mManaged;
-    std::span<const PrototypeDesc* const> mChildren;
+    // The braces let a designated initializer leave the spans out (clang's missing-field check).
+    std::span<const ComponentValue> mDefaults{};       // NOLINT(readability-redundant-member-init)
+    std::span<const ManagedBinding> mManaged{};        // NOLINT(readability-redundant-member-init)
+    std::span<const PrototypeDesc* const> mChildren{}; // NOLINT(readability-redundant-member-init)
 };
 
 /// A registered prototype: its entity (a prototype entity, outside every query) and what the

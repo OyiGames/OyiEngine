@@ -2,6 +2,7 @@ oyi_add_module(ecs
     PUBLIC_HEADERS
         include/oyi_ecs/AccessLog.h
         include/oyi_ecs/Archetype.h
+        include/oyi_ecs/Builders.h
         include/oyi_ecs/ChunkLayout.h
         include/oyi_ecs/ChunkView.h
         include/oyi_ecs/CommandBuffer.h
@@ -12,6 +13,7 @@ oyi_add_module(ecs
         include/oyi_ecs/Facade.h
         include/oyi_ecs/Firewall.h
         include/oyi_ecs/Managed.h
+        include/oyi_ecs/ManagedObject.h
         include/oyi_ecs/Message.h
         include/oyi_ecs/Query.h
         include/oyi_ecs/Resource.h
@@ -23,6 +25,7 @@ oyi_add_module(ecs
     SOURCES
         src/oyi_ecs/AccessLog.cpp
         src/oyi_ecs/Archetype.cpp
+        src/oyi_ecs/Builders.cpp
         src/oyi_ecs/ChunkLayout.cpp
         src/oyi_ecs/CommandBuffer.cpp
         src/oyi_ecs/ComponentRegistry.cpp

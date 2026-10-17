@@ -143,7 +143,46 @@ def render_header(schema: HeaderSchema) -> str:
             out.append("")
         out.append("} // namespace oyi::core")
         out.append("")
+    out.extend(_module_cpp(schema))
     return "\n".join(out)
+
+
+def _module_cpp(schema: HeaderSchema) -> list[str]:
+    """The header's ModuleSchema (`kModule`), after the traits so every info symbol exists."""
+    if not schema.records:
+        return []
+    owner = "::".join(schema.records[0].namespace)
+    groups = {
+        "Components": [r for r in schema.records if r.kind == "component"],
+        "Messages": [r for r in schema.records if r.kind == "struct" and "Message" in r.flags],
+        "Structs": [r for r in schema.records if r.kind == "struct" and "Message" not in r.flags],
+    }
+    out: list[str] = []
+    if owner:
+        out.append(f"namespace {owner} {{")
+        out.append("")
+    spans: dict[str, str] = {}
+    for group, records in groups.items():
+        if not records:
+            spans[group] = "{}"
+            continue
+        symbol = f"kModule{group}"
+        out.append(f"inline constexpr const {_CORE}ComponentInfo* {symbol}[] = {{")
+        for r in records:
+            ns = "::".join(r.namespace)
+            out.append(f"    &::{ns}::k{r.name}Info," if ns else f"    &::k{r.name}Info,")
+        out.append("};")
+        spans[group] = symbol
+    out.append("/// Every record of this header by role (ADR-0024): what RegisterModule registers.")
+    out.append(
+        f'inline constexpr {_CORE}ModuleSchema kModule{{.mName = "{owner}", .mSchemaHash = kSchemaHash, '
+        f".mComponents = {spans['Components']}, .mMessages = {spans['Messages']}, .mStructs = {spans['Structs']}}};"
+    )
+    out.append("")
+    if owner:
+        out.append(f"}} // namespace {owner}")
+        out.append("")
+    return out
 
 
 def render_json(schema: HeaderSchema) -> str:

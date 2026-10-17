@@ -1,7 +1,7 @@
 {
   "generator": "oyi_codegen 0.1.0",
   "header": "Basic.h",
-  "schemaHash": "0xe76141769b9f6dba",
+  "schemaHash": "0xfe5eb522a18bcc93",
   "records": [
     {
       "name": "oyi::golden::Extent",
@@ -293,6 +293,30 @@
       ],
       "layoutHash": "0x96c006bce26d3c77",
       "fields": []
+    },
+    {
+      "name": "oyi::golden::Hit",
+      "kind": "struct",
+      "typeId": "0xebd64783c6f6b5ba",
+      "size": 4,
+      "align": 4,
+      "flags": [
+        "Message"
+      ],
+      "layoutHash": "0xc38ac9ccc203a5c7",
+      "description": "Something hit something",
+      "fields": [
+        {
+          "name": "mDamage",
+          "type": "std::uint32_t",
+          "kind": "UInt32",
+          "offset": 0,
+          "size": 4,
+          "count": 1,
+          "flags": [],
+          "default": 1
+        }
+      ]
     }
   ]
 }

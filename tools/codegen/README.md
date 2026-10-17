@@ -42,7 +42,7 @@ struct OYI_COMPONENT(Tag) Dead {};
 | Annotation | Options |
 |---|---|
 | `OYI_COMPONENT(...)` | `Tag` (no data), `Replicated` (all fields), `Chunk` (one value per chunk), `Predicted` (client prediction history), `Transient` (rebuilt at run time: saved as defaults, never replicated or predicted), `ReadOnly` (derived by systems; tools only display it), `Description = "..."` |
-| `OYI_STRUCT(...)` | marks a value type that components may embed; `Description = "..."` |
+| `OYI_STRUCT(...)` | marks a value type that components may embed; `Message` (a record that travels as a message, never embedded), `Description = "..."` |
 | `OYI_FIELD(...)` | `Replicated`, `Hidden`, `Quantize = <step>` (float and double only), `ReadOnly`, `Range = <min>..<max>` and `Step = <increment>` (numeric fields), `Unit = <name>` (a bare name such as `m`, or a quoted string such as `"m/s"`), `Asset = <Kind>` (the field must be an `oyi::core::AssetId`), `Description = "..."` |
 
 Option values containing spaces or commas go in double quotes (`\"` escapes a quote). `Description`, `Range`,
