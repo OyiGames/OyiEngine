@@ -316,7 +316,7 @@ TEST_CASE("scripts read and write managed state blocks by type name", "[script][
     const EntityId owner = *f.mWorld.CreateEntity(MaskOf({f.mTypes.mPosition}));
     const EntityId bare  = *f.mWorld.CreateEntity(MaskOf({f.mTypes.mPosition, f.mTypes.mHealth}));
     const ManagedId id   = *f.mWorld.GetManaged().Create<ScriptBrain>(owner);
-    f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mUpdates = 4;
+    f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->GetStateForWrite().mUpdates = 4;
     ScriptTick tick{.mVm       = &f.mVm,
                     .mModule   = *f.mVm.Load("managed", R"lua(
         local Brain = oyi.managed("oyi::ecs_fixture::BrainState")
@@ -345,7 +345,7 @@ TEST_CASE("scripts read and write managed state blocks by type name", "[script][
     REQUIRE(f.mSchedule.RunWindow(&RunScript, &tick).has_value());
     INFO(f.mVm.GetLastError());
     REQUIRE(tick.mResult.has_value());
-    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mSawPrevX == 2.5f);
-    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mUpdates == 4); // absent fields keep their value
+    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->GetState().mSawPrevX == 2.5f);
+    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->GetState().mUpdates == 4); // absent fields keep their value
     CHECK(f.mWorld.IsAlive(bare));
 }

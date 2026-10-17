@@ -52,6 +52,11 @@ struct OYI_COMPONENT(Transient, ReadOnly, Description = "Rebuilt every frame by 
 
 struct OYI_COMPONENT(Tag, Replicated) Marker {};
 
+/// A message (ADR-0024): an OYI_STRUCT that travels, never embedded.
+struct OYI_STRUCT(Message, Description = "Something hit something") Hit {
+    std::uint32_t mDamage = 1;
+};
+
 } // namespace oyi::golden
 
 // clang-format on

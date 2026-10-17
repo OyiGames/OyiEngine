@@ -23,6 +23,7 @@ include(OyiModule)
 option(OYI_BUILD_TOOLS "Build the oyi command-line tools" ON)
 option(OYI_USE_MIMALLOC "Run SystemAllocator on mimalloc instead of the C runtime heap (ADR-0018)" ON)
 option(OYI_PROFILE "Compile Tracy zones, frame marks and thread names into the engine (ADR-0018)" OFF)
+option(OYI_BUILD_SAMPLES "Build the samples (samples/; each is also a test)" ON)
 
 add_subdirectory(engine)
 
@@ -32,6 +33,10 @@ endif()
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
+endif()
+
+if(OYI_BUILD_SAMPLES)
+    add_subdirectory(samples)
 endif()
 
 # SDK export: the editor repository consumes the engine through find_package(oyi) (ADR-0015).

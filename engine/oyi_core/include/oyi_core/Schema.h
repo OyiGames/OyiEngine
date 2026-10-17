@@ -47,6 +47,7 @@ enum class ComponentFlags : uint8_t {
     Predicted  = 1u << 3u, ///< ADR-0017: takes part in client prediction (keeps an N-frame history)
     Transient  = 1u << 4u, ///< ADR-0024: rebuilt at run time; saved as defaults, never replicated or predicted
     ReadOnly   = 1u << 5u, ///< ADR-0024: derived by systems; tools display it but never write it
+    Message    = 1u << 6u, ///< ADR-0024: an OYI_STRUCT that travels as a message, never embedded
 };
 OYI_ENUM_FLAGS(ComponentFlags);
 
@@ -89,5 +90,15 @@ struct ComponentInfo {
 /// OYI_COMPONENT; `ComponentTraits<T>::kInfo` is how typed APIs reach the table.
 template <typename T>
 struct ComponentTraits;
+
+/// What one generated component header declares (its `kModule`, ADR-0024): the records by role,
+/// so a world registers a whole module at once (oyi_ecs RegisterModule) and tools list it.
+struct ModuleSchema {
+    std::string_view mName; ///< the namespace of the header's first record, e.g. "oyi::transform"
+    uint64_t mSchemaHash = 0;
+    std::span<const ComponentInfo* const> mComponents; ///< OYI_COMPONENT records
+    std::span<const ComponentInfo* const> mMessages;   ///< OYI_STRUCT(Message) records
+    std::span<const ComponentInfo* const> mStructs;    ///< the other OYI_STRUCT records (embedded values, state blocks)
+};
 
 } // namespace oyi::core

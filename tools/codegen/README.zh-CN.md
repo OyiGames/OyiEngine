@@ -39,7 +39,7 @@ struct OYI_COMPONENT(Tag) Dead {};
 | 标注 | 选项 |
 |---|---|
 | `OYI_COMPONENT(...)` | `Tag`（无数据）、`Replicated`（全部字段同步）、`Chunk`（每 chunk 一份）、`Predicted`（客户端预测历史）、`Transient`（运行时重建：存盘写默认值，不复制不预测）、`ReadOnly`（system 派生，工具只显示）、`Description = "..."` |
-| `OYI_STRUCT(...)` | 标记组件可以内嵌的值类型；`Description = "..."` |
+| `OYI_STRUCT(...)` | 标记组件可以内嵌的值类型；`Message`（作为消息传递、不内嵌的记录）、`Description = "..."` |
 | `OYI_FIELD(...)` | `Replicated`、`Hidden`、`Quantize = <步长>`（仅 float / double）、`ReadOnly`、`Range = <min>..<max>` 与 `Step = <增量>`（数值字段）、`Unit = <名字>`（裸名字如 `m`，或带引号的字符串如 `"m/s"`）、`Asset = <种类>`（字段必须是 `oyi::core::AssetId`）、`Description = "..."` |
 
 含空格或逗号的选项值用双引号（`\"` 转义引号）。`Description`、`Range`、`Step`、`Unit`、`Asset` 是给工具用的（ADR-0024）：进运行时的 `FieldInfo` / `ComponentInfo` 与 schema JSON，不改布局。schema JSON 还记录每个字段的默认成员初始化（`default`，仅字面量）和枚举字段的枚举项。构建把所有 SDK 模块的 schema JSON 合并成 `oyi_schema.json`（`python -m oyi_codegen merge`），`oyi` 工具内嵌它（`oyi schema dump`）。

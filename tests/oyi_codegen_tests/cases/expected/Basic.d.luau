@@ -59,4 +59,11 @@ export type ScratchPartial = {
 export type Marker = {}
 export type MarkerPartial = {}
 
+export type Hit = {
+    mDamage: number,
+}
+export type HitPartial = {
+    mDamage: number?,
+}
+
 return {}

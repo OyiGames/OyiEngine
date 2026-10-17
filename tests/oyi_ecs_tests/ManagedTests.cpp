@@ -228,14 +228,14 @@ TEST_CASE("a managed system updates every live object on the main thread with th
                    JobSystem::Config{.mWorkerCount = 2, .mMaxJobs = 64, .mMaxCounters = 32, .mSpinIterations = 8});
     // No snapshot yet: Prev reads nothing. FixedSimulation captures; Variable updates.
     REQUIRE(f.mSchedule.RunPhase(Phase::Variable, jobs).has_value());
-    CHECK(f.BrainOf(first)->mState.mSawPrevX == -1.0f);
+    CHECK(f.BrainOf(first)->GetState().mSawPrevX == -1.0f);
     REQUIRE(f.mSchedule.RunPhase(Phase::FixedSimulation, jobs).has_value());
     REQUIRE(f.mSchedule.RunPhase(Phase::Variable, jobs).has_value());
     CHECK(brains.GetLastUpdateCount() == 2);
-    CHECK(f.BrainOf(first)->mState.mUpdates == 2);
+    CHECK(f.BrainOf(first)->GetState().mUpdates == 2);
     CHECK(f.BrainOf(first)->mRanOnMain);
-    CHECK(f.BrainOf(first)->mState.mSawPrevX == 1.0f);
-    CHECK(f.BrainOf(second)->mState.mSawPrevX == 2.0f);
+    CHECK(f.BrainOf(first)->GetState().mSawPrevX == 1.0f);
+    CHECK(f.BrainOf(second)->GetState().mSawPrevX == 2.0f);
     CHECK(f.mWorld.Get<Health>(first)->mCurrent == 98);
     CHECK(order == std::vector<EntityId>{first, second, first, second});
 }
@@ -258,7 +258,7 @@ TEST_CASE("a managed system collects the objects of destroyed owners before upda
     CHECK(brains.GetLastUpdateCount() == 1);
     CHECK_FALSE(f.mPool.IsAlive(firstBrain));
     CHECK(f.mPool.GetLiveCount() == 1);
-    CHECK(f.BrainOf(second)->mState.mUpdates == 2);
+    CHECK(f.BrainOf(second)->GetState().mUpdates == 2);
 
     // A dangling reference (object destroyed by hand) is skipped, not crashed on.
     f.mPool.Destroy(f.mWorld.Get<BrainRef>(second)->mObject);
@@ -322,7 +322,7 @@ TEST_CASE("managed updates beside parallel jobs match the serial run", "[ecs][ma
             for (size_t i = 0; i < positions.size(); ++i) {
                 state.push_back(positions[i].mX);
                 state.push_back(static_cast<float>(healths[i].mCurrent));
-                state.push_back(f.mPool.Resolve<Brain>(refs[i].mObject)->mState.mSawPrevX);
+                state.push_back(f.mPool.Resolve<Brain>(refs[i].mObject)->GetState().mSawPrevX);
             }
         });
         return state;
@@ -398,7 +398,7 @@ TEST_CASE("an OYI_MANAGED type is described by its state block and its access se
     // Objects answer with their info; an untyped object has none and is never found by type.
     const EntityId entity = f.Spawn();
     CHECK(f.BrainOf(entity)->GetTypeInfo() == &info);
-    CHECK(f.BrainOf(entity)->GetStateBytes() == &f.BrainOf(entity)->mState);
+    CHECK(f.BrainOf(entity)->GetStateBytes() == &f.BrainOf(entity)->GetState());
     CHECK(f.mPool.FindByOwner(entity, info.GetTypeId()) == f.BrainOf(entity));
     const ManagedId scribble = *f.mPool.Create<Scribble>(entity);
     CHECK(f.mPool.Resolve(scribble)->GetTypeInfo() == nullptr);
@@ -439,21 +439,21 @@ TEST_CASE("a managed state write replays at the sync point like any other comman
     commands.WriteManagedState(entity, id, &state, 3);                                        // wrong size
     commands.WriteManagedState(other, id, &state, sizeof(state));                             // wrong owner
     commands.WriteManagedState(entity, ManagedId{.mIndex = 99, .mGeneration = 1}, &state, 8); // stale id
-    CHECK(f.BrainOf(entity)->mState.mUpdates == 0);
+    CHECK(f.BrainOf(entity)->GetState().mUpdates == 0);
 
     const std::array<CommandBuffer*, 1> buffers{&commands};
     const World::ReplayStats stats = f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
     CHECK(stats.mApplied == 1);
     CHECK(stats.mSkipped == 3);
-    CHECK(f.BrainOf(entity)->mState.mUpdates == 5);
-    CHECK(f.BrainOf(entity)->mState.mSawPrevX == 2.0f);
-    CHECK(f.BrainOf(other)->mState.mUpdates == 0);
+    CHECK(f.BrainOf(entity)->GetState().mUpdates == 5);
+    CHECK(f.BrainOf(entity)->GetState().mSawPrevX == 2.0f);
+    CHECK(f.BrainOf(other)->GetState().mUpdates == 0);
 }
 
 TEST_CASE("a window reads state blocks and its writes land when it closes", "[ecs][managed][firewall][object]") {
     Fixture f;
-    const EntityId entity              = f.Spawn();
-    f.BrainOf(entity)->mState.mUpdates = 3;
+    const EntityId entity                          = f.Spawn();
+    f.BrainOf(entity)->GetStateForWrite().mUpdates = 3;
     StateEdit edit;
     edit.mFixture = &f;
     edit.mEntity  = entity;
@@ -461,19 +461,19 @@ TEST_CASE("a window reads state blocks and its writes land when it closes", "[ec
     CHECK(edit.mSeen == f.mWorld.Get<BrainRef>(entity)->mObject);
     CHECK(edit.mInfoMatches);
     CHECK(edit.mSawUpdates == 3);
-    CHECK(f.BrainOf(entity)->mState.mUpdates == 40);
-    CHECK(f.BrainOf(entity)->mState.mSawPrevX == 4.0f);
+    CHECK(f.BrainOf(entity)->GetState().mUpdates == 40);
+    CHECK(f.BrainOf(entity)->GetState().mSawPrevX == 4.0f);
 }
 
 TEST_CASE("managed objects and their state blocks survive the world file", "[ecs][managed][serialization][object]") {
     Fixture f;
-    const EntityId first               = f.Spawn();
-    const EntityId second              = f.Spawn();
-    f.BrainOf(first)->mState.mUpdates  = 7;
-    f.BrainOf(first)->mState.mSawPrevX = 1.5f;
-    f.BrainOf(second)->mState.mUpdates = 9;
-    const ManagedId scribble           = *f.mPool.Create<Scribble>(first); // run-time only: not saved
-    const ManagedId firstBrain         = f.mWorld.Get<BrainRef>(first)->mObject;
+    const EntityId first                           = f.Spawn();
+    const EntityId second                          = f.Spawn();
+    f.BrainOf(first)->GetStateForWrite().mUpdates  = 7;
+    f.BrainOf(first)->GetStateForWrite().mSawPrevX = 1.5f;
+    f.BrainOf(second)->GetStateForWrite().mUpdates = 9;
+    const ManagedId scribble                       = *f.mPool.Create<Scribble>(first); // run-time only: not saved
+    const ManagedId firstBrain                     = f.mWorld.Get<BrainRef>(first)->mObject;
     std::pmr::vector<std::byte> bytes;
     REQUIRE(f.mWorld.Save(bytes).has_value());
 
@@ -495,13 +495,13 @@ TEST_CASE("managed objects and their state blocks survive the world file", "[ecs
     CHECK(brain->GetId() == firstBrain);
     CHECK(brain->GetOwner() == first);
     CHECK(brain->mLoaded);
-    CHECK(brain->mState.mUpdates == 7);
-    CHECK(brain->mState.mSawPrevX == 1.5f);
+    CHECK(brain->GetState().mUpdates == 7);
+    CHECK(brain->GetState().mSawPrevX == 1.5f);
     CHECK(brain->mPosition == types.mPosition);
     CHECK(brain->mHealth == types.mHealth);
     const auto* const other = loaded.GetManaged().FindByOwner(second, Brain::GetManagedTypeInfo().GetTypeId());
     REQUIRE(other != nullptr);
-    CHECK(loaded.GetManaged().Resolve<Brain>(other->GetId())->mState.mUpdates == 9);
+    CHECK(loaded.GetManaged().Resolve<Brain>(other->GetId())->GetState().mUpdates == 9);
 
     // The restored objects run like the originals.
     Schedule schedule(f.mAllocator, loaded);
@@ -513,7 +513,7 @@ TEST_CASE("managed objects and their state blocks survive the world file", "[ecs
     REQUIRE(schedule.Build().has_value());
     REQUIRE(schedule.RunPhaseSerial(Phase::Variable).has_value());
     CHECK(brains.GetLastUpdateCount() == 2);
-    CHECK(brain->mState.mUpdates == 8);
+    CHECK(brain->GetState().mUpdates == 8);
     CHECK(loaded.Get<Health>(first)->mCurrent == 99);
 
     // New objects after a load never collide with restored ids.

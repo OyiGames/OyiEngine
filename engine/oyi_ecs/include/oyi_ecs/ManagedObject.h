@@ -138,7 +138,8 @@ template <typename Derived, typename State, typename AccessSpec>
 ///       void Update(ManagedContext& context) override { ... mState.mCooldown ... }
 ///   };
 ///
-/// Members other than mState are run-time private: never saved, never shown; OnLoaded rebuilds them.
+/// The block is private to the class (GetState / GetStateForWrite outside); members other than
+/// mState are run-time private: never saved, never shown; OnLoaded rebuilds them.
 #define OYI_MANAGED(Class, State, ...)                                                                                 \
 public:                                                                                                                \
     using ManagedState  = State;                                                                                       \
@@ -157,6 +158,14 @@ public:                                                                         
     [[nodiscard]] void* GetStateBytesForWrite() noexcept override {                                                    \
         return &mState;                                                                                                \
     }                                                                                                                  \
+    [[nodiscard]] const State& GetState() const noexcept {                                                             \
+        return mState;                                                                                                 \
+    }                                                                                                                  \
+    [[nodiscard]] State& GetStateForWrite() noexcept {                                                                 \
+        return mState;                                                                                                 \
+    }                                                                                                                  \
+                                                                                                                       \
+private:                                                                                                               \
     State mState{};                                                                                                    \
                                                                                                                        \
 private:

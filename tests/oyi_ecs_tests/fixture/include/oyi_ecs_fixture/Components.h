@@ -67,18 +67,18 @@ struct OYI_STRUCT() BrainState {
     float mSawPrevX   = -2.0f;
 };
 
-/// Messages are plain OYI_STRUCT records.
-struct OYI_STRUCT() Damage {
+/// Messages are OYI_STRUCT(Message) records.
+struct OYI_STRUCT(Message) Damage {
     oyi::ecs::EntityId mSource{};
     float mAmount = 0.0f;
 };
 
-struct OYI_STRUCT() Ping {
+struct OYI_STRUCT(Message) Ping {
     uint32_t mSerial = 0;
 };
 
 /// "Move me by this much": a system turns it into velocity.
-struct OYI_STRUCT() Nudge {
+struct OYI_STRUCT(Message) Nudge {
     float mX = 0.0f;
 };
 

@@ -25,7 +25,7 @@ class FieldKind(StrEnum):
 
 COMPONENT_OPTIONS = {"Tag", "Replicated", "Chunk", "Predicted", "Transient", "ReadOnly", "Description"}
 FIELD_OPTIONS = {"Replicated", "Hidden", "Quantize", "ReadOnly", "Asset", "Range", "Step", "Unit", "Description"}
-STRUCT_OPTIONS = {"Description"}
+STRUCT_OPTIONS = {"Description", "Message"}
 # Options that carry a value for tools rather than a flag; they never appear in `flags`.
 VALUE_OPTIONS = {"Quantize", "Asset", "Range", "Step", "Unit", "Description"}
 

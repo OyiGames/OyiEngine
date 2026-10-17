@@ -94,3 +94,18 @@ TEST_CASE("layout hash differs between components", "[codegen]") {
 }
 
 } // namespace
+
+TEST_CASE("the header describes itself as a module by record role", "[codegen][module]") {
+    STATIC_REQUIRE(kModule.mSchemaHash == kSchemaHash);
+    CHECK(kModule.mName == "oyi::codegen_sample");
+    CHECK(kModule.mComponents.size() == 5); // Position, Health, Dead, ChunkBounds, Scratch
+    CHECK(kModule.mMessages.size() == 1);
+    CHECK(kModule.mStructs.size() == 1);
+    CHECK(kModule.mMessages[0] == &kPokeInfo);
+    CHECK(kModule.mStructs[0] == &kVec3Info);
+    CHECK(HasFlag(kPokeInfo.mFlags, oyi::core::ComponentFlags::Message));
+    CHECK_FALSE(HasFlag(kVec3Info.mFlags, oyi::core::ComponentFlags::Message));
+    for (const oyi::core::ComponentInfo* const info : kModule.mComponents) {
+        CHECK_FALSE(HasFlag(info->mFlags, oyi::core::ComponentFlags::Message));
+    }
+}

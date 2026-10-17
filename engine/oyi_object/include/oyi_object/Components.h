@@ -22,13 +22,13 @@ struct OYI_COMPONENT(ReadOnly, Description = "Prototype and object root of a spa
 
 /// Sent to an entity at the sync point that materialised it, after every managed object of the
 /// same batch exists and ran OnSpawned.
-struct OYI_STRUCT() Spawned {
+struct OYI_STRUCT(Message) Spawned {
     PrototypeId mPrototype{};
 };
 
 /// Sent to an entity one sync point before the factory destroys it; the entity is still alive
 /// when the receivers run.
-struct OYI_STRUCT() Despawning {
+struct OYI_STRUCT(Message) Despawning {
     PrototypeId mPrototype{};
 };
 

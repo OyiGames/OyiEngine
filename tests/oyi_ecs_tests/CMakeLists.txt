@@ -3,6 +3,7 @@ add_subdirectory(fixture)
 oyi_add_test(oyi_ecs_tests
     SOURCES
         AccessCheckTests.cpp
+        BuilderTests.cpp
         ChunkLayoutTests.cpp
         ChunkParallelTests.cpp
         CommandBufferTests.cpp

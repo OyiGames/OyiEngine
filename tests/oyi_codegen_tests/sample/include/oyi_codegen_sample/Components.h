@@ -46,6 +46,11 @@ struct OYI_COMPONENT() Health {
 
 struct OYI_COMPONENT(Tag) Dead {};
 
+/// A message record (ADR-0024): listed under kModule.mMessages, not mStructs.
+struct OYI_STRUCT(Message) Poke {
+    float mStrength = 1.0f;
+};
+
 struct OYI_COMPONENT(Chunk) ChunkBounds {
     Vec3 mMin{};
     Vec3 mMax{};
