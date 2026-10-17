@@ -18,8 +18,9 @@ namespace oyi::object {
 /// Types are named by TypeId so the file does not depend on a world's registration order; the
 /// loader resolves them against the world it loads into. Default values are the component bytes
 /// for the schema the blob was baked for (the header's schema hash, checked at Open).
-inline constexpr uint64_t kPrototypeAssetKind    = core::MakeTypeId("oyi::object::PrototypeBlob").mValue;
-inline constexpr uint32_t kPrototypeBakerVersion = 1;
+inline constexpr uint64_t kPrototypeAssetKind = core::MakeTypeId("oyi::object::PrototypeBlob").mValue;
+/// 0 while the engine is 0.x (BlobExpectation treats 0 as "any"; the schema hash still guards).
+inline constexpr uint32_t kPrototypeBakerVersion = 0;
 
 /// A default value: the component and its bytes.
 struct PrototypeValueRecord {

@@ -31,7 +31,10 @@ namespace oyi::ecs {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'O', 'Y', 'I', 'W'};
-constexpr uint32_t kFormatVersion = 3; ///< v3 (ADR-0024): managed state blocks after the chunks
+/// 0 while the engine is 0.x: the layout may change between builds without a compatibility
+/// promise (today: entity marks, prototype archetypes and the managed table of ADR-0024 are
+/// in). Becomes 1 with the first release that keeps old files readable.
+constexpr uint32_t kFormatVersion = 0;
 
 /// Appends plain values to a byte vector.
 class Writer {
