@@ -4,6 +4,7 @@
 #include <oyi_core/MemoryResource.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
+#include <oyi_ecs/ManagedObject.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -72,6 +73,11 @@ public:
     void SetComponentEnabled(EntityId entity, ComponentTypeIndex type, bool enabled) noexcept;
     void SetComponentEnabled(PendingEntity entity, ComponentTypeIndex type, bool enabled) noexcept;
 
+    /// Overwrites the state block of the managed object `id` owned by `owner` with `size` bytes
+    /// copied now (ADR-0024). Skipped at replay when the id is stale, the owner differs, the
+    /// object is untyped or `size` is not the state size.
+    void WriteManagedState(EntityId owner, ManagedId id, const void* data, uint32_t size) noexcept;
+
     [[nodiscard]] bool IsEmpty() const noexcept { return mCommands.empty(); }
     [[nodiscard]] uint32_t GetCommandCount() const noexcept { return static_cast<uint32_t>(mCommands.size()); }
     [[nodiscard]] uint32_t GetCreateCount() const noexcept { return static_cast<uint32_t>(mCreateMasks.size()); }
@@ -81,13 +87,14 @@ public:
 private:
     friend class World;
 
-    enum class Op : uint8_t { Create, Clone, Destroy, Add, Remove, Set, Enable, Mark };
+    enum class Op : uint8_t { Create, Clone, Destroy, Add, Remove, Set, Enable, Mark, ManagedState };
 
     struct Command {
         uint64_t mSortKey = 0;
         Op mOp            = Op::Create;
         bool mFlag        = false;            ///< Enable: the new state
         EntityMark mMark  = EntityMark::None; ///< Mark: the new mark
+        ManagedId mManaged{};                 ///< ManagedState: the object
         ComponentTypeIndex mType;
         EntityId mEntity;       ///< target when mPending is invalid; Clone: the source
         PendingEntity mPending; ///< target created earlier in this buffer; Create / Clone: the slot it fills

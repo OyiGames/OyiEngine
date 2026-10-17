@@ -11,6 +11,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/Resource.h>
@@ -86,6 +87,16 @@ public:
     [[nodiscard]] const MessageRegistry& GetMessages() const noexcept { return mMessages; }
     [[nodiscard]] ResourceRegistry& GetResources() noexcept { return mResources; }
     [[nodiscard]] const ResourceRegistry& GetResources() const noexcept { return mResources; }
+    /// The managed objects of this world (ADR-0024): what Save / Load carry and what windows and
+    /// scripts address. Separate pools still work for code that keeps its own.
+    [[nodiscard]] ManagedPool& GetManaged() noexcept { return mManaged; }
+    [[nodiscard]] const ManagedPool& GetManaged() const noexcept { return mManaged; }
+    [[nodiscard]] ManagedTypeRegistry& GetManagedTypes() noexcept { return mManagedTypes; }
+    [[nodiscard]] const ManagedTypeRegistry& GetManagedTypes() const noexcept { return mManagedTypes; }
+    template <typename T>
+    [[nodiscard]] core::Result RegisterManaged() noexcept {
+        return mManagedTypes.Register<T>();
+    }
 
     /// The Environment singleton (ADR-0007), registered as resource 0 at construction. The main
     /// loop writes it between phases; systems and windows reach it through their contexts.
@@ -258,6 +269,8 @@ private:
     ResourceRegistry mResources;
     Environment mEnvironment;
     EntityRegistry mEntities;
+    ManagedPool mManaged;
+    ManagedTypeRegistry mManagedTypes;
     std::pmr::vector<Archetype*> mArchetypes;
     std::pmr::vector<EntityMark> mMarks; ///< by entity index; None when shorter than the index
     uint32_t mVersion = 1;

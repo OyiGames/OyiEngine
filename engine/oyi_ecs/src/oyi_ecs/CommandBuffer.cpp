@@ -2,6 +2,7 @@
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
+#include <oyi_ecs/ManagedObject.h>
 
 #include <cstdint>
 #include <cstring>
@@ -18,6 +19,8 @@ void CommandBuffer::Record(Op op, ComponentTypeIndex type, EntityId entity, Pend
     mCommands.push_back(Command{.mSortKey       = mSortKey,
                                 .mOp            = op,
                                 .mFlag          = flag,
+                                .mMark          = EntityMark::None,
+                                .mManaged       = ManagedId{},
                                 .mType          = type,
                                 .mEntity        = entity,
                                 .mPending       = pending,
@@ -87,6 +90,12 @@ void CommandBuffer::SetComponentEnabled(EntityId entity, ComponentTypeIndex type
 
 void CommandBuffer::SetComponentEnabled(PendingEntity entity, ComponentTypeIndex type, bool enabled) noexcept {
     Record(Op::Enable, type, EntityId::Invalid(), entity, 0, 0, enabled);
+}
+
+void CommandBuffer::WriteManagedState(EntityId owner, ManagedId id, const void* data, uint32_t size) noexcept {
+    const uint32_t offset = StorePayload(data, size);
+    Record(Op::ManagedState, ComponentTypeIndex::Invalid(), owner, PendingEntity{}, offset, size, false);
+    mCommands.back().mManaged = id;
 }
 
 void CommandBuffer::SetMark(EntityId entity, EntityMark mark) noexcept {

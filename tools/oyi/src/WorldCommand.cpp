@@ -19,9 +19,9 @@ namespace {
 
 void PrintSummaryJson(const ecs::WorldFileSummary& summary) {
     std::string out = std::format(
-        R"({{"formatVersion":{},"schemaHash":"{:#018x}","chunkSize":{},"worldVersion":{},"entityCount":{},"entityCapacity":{},"prototypeCount":{},"lockedCount":{},"components":[)",
+        R"({{"formatVersion":{},"schemaHash":"{:#018x}","chunkSize":{},"worldVersion":{},"entityCount":{},"entityCapacity":{},"prototypeCount":{},"lockedCount":{},"managedCount":{},"components":[)",
         summary.mFormatVersion, summary.mSchemaHash, summary.mChunkSize, summary.mWorldVersion, summary.mEntityCount,
-        summary.mEntityCapacity, summary.mPrototypeCount, summary.mLockedCount);
+        summary.mEntityCapacity, summary.mPrototypeCount, summary.mLockedCount, summary.mManagedCount);
     for (size_t i = 0; i < summary.mComponents.size(); ++i) {
         const ecs::WorldFileSummary::Component& component = summary.mComponents[i];
         out += std::format(R"({}{{"name":{},"typeId":"{:#018x}","layoutHash":"{:#018x}","size":{},"align":{}}})",
@@ -44,10 +44,11 @@ void PrintSummaryJson(const ecs::WorldFileSummary& summary) {
 
 void PrintSummaryText(const ecs::WorldFileSummary& summary) {
     std::fputs(std::format("world file: format {}, schema {:#018x}, chunk size {}, version {}\n"
-                           "entities: {} alive of {} slots ({} prototypes, {} locked); archetypes: {}\n",
+                           "entities: {} alive of {} slots ({} prototypes, {} locked); archetypes: {}; "
+                           "managed objects: {}\n",
                            summary.mFormatVersion, summary.mSchemaHash, summary.mChunkSize, summary.mWorldVersion,
                            summary.mEntityCount, summary.mEntityCapacity, summary.mPrototypeCount, summary.mLockedCount,
-                           summary.mArchetypes.size())
+                           summary.mArchetypes.size(), summary.mManagedCount)
                    .c_str(),
                stdout);
     for (size_t i = 0; i < summary.mComponents.size(); ++i) {

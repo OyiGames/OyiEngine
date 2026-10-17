@@ -85,6 +85,7 @@ def main(argv: list[str]) -> int:
             world_ok = (
                 result.returncode == 0
                 and doc["entityCount"] > 0
+                and "managedCount" in doc
                 and len(doc["archetypes"]) >= 1
                 and doc["components"][0]["name"].startswith("oyi::")
             )

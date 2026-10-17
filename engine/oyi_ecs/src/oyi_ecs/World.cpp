@@ -10,6 +10,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/Resource.h>
 #include <oyi_ecs/World.h>
 
@@ -30,6 +31,8 @@ World::World(core::Allocator& allocator, Config config) noexcept
     , mConfig(config)
     , mResource(allocator)
     , mEntities(allocator)
+    , mManaged(allocator)
+    , mManagedTypes(allocator)
     , mArchetypes(&mResource)
     , mMarks(&mResource) {
     const core::Expected<ResourceTypeIndex> environment =
@@ -381,6 +384,16 @@ World::ReplayStats World::ReplayCommands(std::span<CommandBuffer* const> buffers
         case CommandBuffer::Op::Mark:
             applied = SetMark(target, command.mMark).has_value();
             break;
+        case CommandBuffer::Op::ManagedState: {
+            ManagedObject* const object = mManaged.Resolve(command.mManaged);
+            if (object != nullptr && object->GetTypeInfo() != nullptr && object->GetOwner() == target &&
+                object->GetTypeInfo()->GetStateSize() == command.mPayloadSize) {
+                std::memcpy(object->GetStateBytesForWrite(), buffer.mPayload.data() + command.mPayloadOffset,
+                            command.mPayloadSize);
+                applied = true;
+            }
+            break;
+        }
         case CommandBuffer::Op::Create:
         case CommandBuffer::Op::Clone:
             break;
@@ -422,10 +435,9 @@ uint64_t World::ComputeStateHash() const noexcept {
         for (uint32_t chunk = 0; chunk < archetype->GetChunkCount(); ++chunk) {
             const uint32_t count                     = archetype->GetChunk(chunk).mCount;
             const std::span<const EntityId> entities = archetype->GetEntities(chunk);
-            hash                                     = HashBytes(hash,
-                                                                 reinterpret_cast<const std::byte*>(
-                                 entities.data()), // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                                                                 entities.size() * sizeof(EntityId));
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto* const entityBytes = reinterpret_cast<const std::byte*>(entities.data());
+            hash                          = HashBytes(hash, entityBytes, entities.size() * sizeof(EntityId));
             for (const ColumnLayout& column : layout.GetColumns()) {
                 hash = HashBytes(hash, archetype->GetColumn(chunk, column),
                                  static_cast<size_t>(count) * column.mElementSize);

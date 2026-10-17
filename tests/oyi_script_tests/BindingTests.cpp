@@ -35,7 +35,9 @@ using oyi::ecs::ComponentMask;
 using oyi::ecs::ComponentTypeIndex;
 using oyi::ecs::EntityId;
 using oyi::ecs::FirewallWindow;
+using oyi::ecs::ManagedContext;
 using oyi::ecs::ManagedId;
+using oyi::ecs::ManagedObject;
 using oyi::ecs::MessageMask;
 using oyi::ecs::MessageTypeIndex;
 using oyi::ecs::Phase;
@@ -115,6 +117,13 @@ void NudgeSystem(SystemContext& context) {
                       .mData           = data};
 }
 
+/// A managed type scripts can address: its state block is the fixture's BrainState.
+class ScriptBrain final : public ManagedObject {
+    OYI_MANAGED(ScriptBrain, BrainState, oyi::ecs::Access<>)
+public:
+    void Update(ManagedContext& /*context*/) override { ++mState.mUpdates; }
+};
+
 struct Fixture {
     SystemAllocator mAllocator;
     World mWorld{mAllocator};
@@ -136,6 +145,7 @@ struct Fixture {
         REQUIRE(mSchedule.AddOrder(nudge, move).has_value());
         REQUIRE(mSchedule.Build().has_value());
         mSchedule.SetSnapshotCapture(&mPrev, MaskOf({mTypes.mPosition}), Phase::Variable);
+        REQUIRE(mWorld.RegisterManaged<ScriptBrain>().has_value());
     }
 };
 
@@ -299,4 +309,43 @@ TEST_CASE("handles are opaque, arrays and foreign handles round-trip through tab
     CHECK(transform->mMatrix[2] == 0.0f);
     CHECK(transform->mMatrix[5] == 1.0f);
     CHECK(f.mWorld.Get<BrainRef>(entity)->mObject == ManagedId{.mIndex = 5, .mGeneration = 9});
+}
+
+TEST_CASE("scripts read and write managed state blocks by type name", "[script][binding][object]") {
+    Fixture f;
+    const EntityId owner = *f.mWorld.CreateEntity(MaskOf({f.mTypes.mPosition}));
+    const EntityId bare  = *f.mWorld.CreateEntity(MaskOf({f.mTypes.mPosition, f.mTypes.mHealth}));
+    const ManagedId id   = *f.mWorld.GetManaged().Create<ScriptBrain>(owner);
+    f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mUpdates = 4;
+    ScriptTick tick{.mVm       = &f.mVm,
+                    .mModule   = *f.mVm.Load("managed", R"lua(
+        local Brain = oyi.managed("oyi::ecs_fixture::BrainState")
+        local Position = oyi.component("oyi::ecs_fixture::Position")
+        local Health = oyi.component("oyi::ecs_fixture::Health")
+        function tick()
+            local owner, bare
+            for _, e in ipairs(oyi.entities({Position})) do
+                if oyi.has(e, Health) then bare = e else owner = e end
+            end
+            local s = oyi.state(owner, Brain)
+            assert(s.mUpdates == 4 and s.mSawPrevX == -2, "state read")
+            oyi.set_state(owner, Brain, { mSawPrevX = 2.5 })
+            assert(oyi.state(owner, Brain).mSawPrevX == -2, "writes are deferred")
+            assert(oyi.state(bare, Brain) == nil, "no object, no state")
+            local ok, err = pcall(oyi.set_state, bare, Brain, {})
+            assert(not ok and string.find(err, "no managed object"), "write without an object")
+            local ok2, err2 = pcall(oyi.managed, "nope")
+            assert(not ok2 and string.find(err2, "unknown managed type"), "unknown type")
+            local ok3, err3 = pcall(oyi.state, owner, 7)
+            assert(not ok3 and string.find(err3, "unknown managed type"), "bad handle")
+        end
+    )lua"),
+                    .mFunction = "tick",
+                    .mResult   = {}};
+    REQUIRE(f.mSchedule.RunWindow(&RunScript, &tick).has_value());
+    INFO(f.mVm.GetLastError());
+    REQUIRE(tick.mResult.has_value());
+    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mSawPrevX == 2.5f);
+    CHECK(f.mWorld.GetManaged().Resolve<ScriptBrain>(id)->mState.mUpdates == 4); // absent fields keep their value
+    CHECK(f.mWorld.IsAlive(bare));
 }
