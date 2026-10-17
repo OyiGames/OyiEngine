@@ -146,7 +146,8 @@ TEST_CASE("a saved world describes itself without a registry", "[ecs][serializat
     const std::pmr::vector<std::byte> bytes = SaveOf(original.mWorld);
     oyi::ecs::WorldFileSummary summary(original.mAllocator);
     REQUIRE(oyi::ecs::DescribeSavedWorld(bytes, summary).has_value());
-    CHECK(summary.mFormatVersion == 2);
+    CHECK(summary.mFormatVersion == 3);
+    CHECK(summary.mManagedCount == 0);
     CHECK(summary.mSchemaHash == original.mWorld.ComputeSchemaHash());
     CHECK(summary.mChunkSize == 16 * 1024);
     CHECK(summary.mWorldVersion == original.mWorld.GetVersion());

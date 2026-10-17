@@ -13,6 +13,8 @@ declare class Handle end
 
 export type ComponentType = number
 export type MessageType = number
+-- A managed type (ADR-0024), named by its state block; scripts see the state block only.
+export type ManagedType = number
 
 export type Environment = {
     frame: number,
@@ -26,6 +28,7 @@ declare oyi: {
     -- Type lookup by the fully qualified C++ name; usable at module top level.
     component: (name: string) -> ComponentType,
     message: (name: string) -> MessageType,
+    managed: (name: string) -> ManagedType,
     env: () -> Environment,
 
     -- Everything below needs an open firewall window: the function a Call runs in.
@@ -33,6 +36,8 @@ declare oyi: {
     has: (entity: Entity, type: ComponentType) -> boolean,
     get: (entity: Entity, type: ComponentType) -> any?,
     prev: (entity: Entity, type: ComponentType) -> any?,
+    state: (entity: Entity, type: ManagedType) -> any?,
+    set_state: (entity: Entity, type: ManagedType, value: { [string]: any }) -> (),
     set: (entity: Entity | PendingEntity, type: ComponentType, value: { [string]: any }) -> (),
     send: (type: MessageType, target: Entity?, value: { [string]: any }) -> (),
     create: (types: { ComponentType }) -> PendingEntity,

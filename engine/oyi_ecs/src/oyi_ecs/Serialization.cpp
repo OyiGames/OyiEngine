@@ -10,6 +10,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/EntityRegistry.h>
+#include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/World.h>
 #include <oyi_ecs/WorldFile.h>
 
@@ -30,7 +31,7 @@ namespace oyi::ecs {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'O', 'Y', 'I', 'W'};
-constexpr uint32_t kFormatVersion = 2; ///< v2 (ADR-0024): entity marks, prototype archetypes
+constexpr uint32_t kFormatVersion = 3; ///< v3 (ADR-0024): managed state blocks after the chunks
 
 /// Appends plain values to a byte vector.
 class Writer {
@@ -118,6 +119,7 @@ void World::Clear() noexcept {
     }
     mArchetypes.clear();
     mMarks.clear();
+    mManaged.Clear();
     mEntities.Clear();
 }
 
@@ -197,6 +199,26 @@ core::Result World::Save(std::pmr::vector<std::byte>& out) const noexcept {
             writer.PutBytes(scratch.data(), layout.GetChunkSize());
         }
     }
+
+    // Managed objects (ADR-0024): id, owner and the state block of every typed object. Objects
+    // without OYI_MANAGED are run-time only and stay out of the file.
+    uint32_t managedCount = 0;
+    mManaged.ForEach(
+        [&managedCount](const ManagedObject& object) { managedCount += object.GetTypeInfo() != nullptr ? 1 : 0; });
+    writer.Put(managedCount);
+    mManaged.ForEach([&writer](const ManagedObject& object) {
+        const ManagedTypeInfo* const info = object.GetTypeInfo();
+        if (info == nullptr) {
+            return;
+        }
+        writer.Put(object.GetId().mIndex);
+        writer.Put(object.GetId().mGeneration);
+        writer.Put(object.GetOwner().mIndex);
+        writer.Put(object.GetOwner().mGeneration);
+        writer.Put(info->GetTypeId().mValue);
+        writer.Put(info->GetStateSize());
+        writer.PutBytes(static_cast<const std::byte*>(object.GetStateBytes()), info->GetStateSize());
+    });
     return {};
 }
 
@@ -348,11 +370,55 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
             }
         }
     }
-    if (located != mEntities.GetAliveCount() || !reader.AtEnd()) {
+    if (located != mEntities.GetAliveCount()) {
         Clear();
         return Corrupt("World::Load: entity table and chunks disagree");
     }
+
+    uint32_t managedCount = 0;
+    if (!reader.Get(managedCount)) {
+        Clear();
+        return Corrupt("World::Load: truncated managed table");
+    }
+    for (uint32_t m = 0; m < managedCount; ++m) {
+        ManagedId id;
+        EntityId owner;
+        uint64_t typeId = 0;
+        uint32_t size   = 0;
+        if (!reader.Get(id.mIndex) || !reader.Get(id.mGeneration) || !reader.Get(owner.mIndex) ||
+            !reader.Get(owner.mGeneration) || !reader.Get(typeId) || !reader.Get(size)) {
+            Clear();
+            return Corrupt("World::Load: truncated managed table");
+        }
+        const std::byte* const bytes = reader.Take(size);
+        if (bytes == nullptr || !id.IsValid() || !mEntities.IsAlive(owner)) {
+            Clear();
+            return Corrupt("World::Load: a managed object names an entity the table does not know");
+        }
+        const ManagedTypeInfo* const info = mManagedTypes.Find(core::TypeId{.mValue = typeId});
+        if (info == nullptr || info->GetStateSize() != size) {
+            Clear();
+            return Corrupt("World::Load: the file holds a managed type this world does not know");
+        }
+        ManagedObject* const object = info->mCreate(mAllocator);
+        if (object == nullptr) {
+            Clear();
+            return core::Fail(core::ErrorCode::OutOfMemory, "World::Load: cannot allocate a managed object");
+        }
+        std::memcpy(object->GetStateBytesForWrite(), bytes, size);
+        if (!mManaged.Restore(id, object, owner).has_value()) {
+            mAllocator.Delete(object);
+            Clear();
+            return Corrupt("World::Load: two managed objects share an id");
+        }
+    }
+    if (!reader.AtEnd()) {
+        Clear();
+        return Corrupt("World::Load: trailing bytes after the managed table");
+    }
     mVersion = worldVersion;
+    // Everything is in place: let the objects rebuild what the file does not carry.
+    mManaged.ForEach([this](ManagedObject& object) { object.OnLoaded(*this); });
     return {};
 }
 
@@ -445,8 +511,20 @@ core::Result DescribeSavedWorld(std::span<const std::byte> data, WorldFileSummar
         located += archetype.mEntityCount;
         out.mArchetypes.push_back(std::move(archetype));
     }
-    if (located != out.mEntityCount || !reader.AtEnd()) {
+    if (located != out.mEntityCount) {
         return Corrupt("world file: entity table and chunks disagree");
+    }
+    if (!reader.Get(out.mManagedCount)) {
+        return Corrupt("world file: truncated managed table");
+    }
+    for (uint32_t m = 0; m < out.mManagedCount; ++m) {
+        uint32_t size = 0;
+        if (!reader.Skip((4 * sizeof(uint32_t)) + sizeof(uint64_t)) || !reader.Get(size) || !reader.Skip(size)) {
+            return Corrupt("world file: truncated managed table");
+        }
+    }
+    if (!reader.AtEnd()) {
+        return Corrupt("world file: trailing bytes after the managed table");
     }
     return {};
 }

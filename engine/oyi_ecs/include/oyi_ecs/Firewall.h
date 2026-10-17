@@ -1,15 +1,19 @@
 #pragma once
 
+#include <oyi_core/TypeId.h>
 #include <oyi_ecs/ChunkView.h>
 #include <oyi_ecs/CommandBuffer.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/Entity.h>
+#include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Resource.h>
 #include <oyi_ecs/Snapshot.h>
 #include <oyi_ecs/World.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace oyi::ecs {
 
@@ -82,6 +86,35 @@ public:
     [[nodiscard]] const Environment& GetEnvironment() const noexcept { return mWorld.GetEnvironment(); }
     [[nodiscard]] Environment& GetEnvironmentForWrite() noexcept { return mWorld.GetEnvironmentForWrite(); }
 
+    // --- managed objects (ADR-0024: only their state blocks are visible here) -------------------
+
+    [[nodiscard]] const ManagedPool& GetManaged() const noexcept { return mWorld.GetManaged(); }
+    /// The live object of managed type `type` owned by `owner`, or an invalid id.
+    [[nodiscard]] ManagedId FindManaged(EntityId owner, core::TypeId type) const noexcept {
+        const ManagedObject* const object = mWorld.GetManaged().FindByOwner(owner, type);
+        return object == nullptr ? ManagedId::Invalid() : object->GetId();
+    }
+    /// nullptr for a stale id or an untyped object.
+    [[nodiscard]] const ManagedTypeInfo* GetManagedInfo(ManagedId id) const noexcept {
+        const ManagedObject* const object = mWorld.GetManaged().Resolve(id);
+        return object == nullptr ? nullptr : object->GetTypeInfo();
+    }
+    /// The live state block bytes; empty for a stale id or an untyped object.
+    [[nodiscard]] std::span<const std::byte> GetManagedState(ManagedId id) const noexcept {
+        const ManagedObject* const object = mWorld.GetManaged().Resolve(id);
+        if (object == nullptr || object->GetTypeInfo() == nullptr) {
+            return {};
+        }
+        return {static_cast<const std::byte*>(object->GetStateBytes()), object->GetTypeInfo()->GetStateSize()};
+    }
+    template <typename State>
+    [[nodiscard]] const State* GetManagedState(ManagedId id) const noexcept {
+        const std::span<const std::byte> bytes = GetManagedState(id);
+        return bytes.size() == sizeof(State)
+                   ? reinterpret_cast<const State*>(bytes.data()) // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                   : nullptr;
+    }
+
     /// Calls `fn(EntityId)` for every live entity with all of `all` and none of `none`.
     template <typename Fn>
     void ForEachEntity(const ComponentMask& all, const ComponentMask& none, Fn&& fn) {
@@ -126,6 +159,16 @@ public:
     /// The same from `size` bytes already laid out as the message type (scripts, tools).
     void SendBytes(MessageTypeIndex type, EntityId target, const void* data, uint32_t size) noexcept {
         mOutbox.Send(type, target, data, size);
+    }
+
+    /// Replaces the state block when the window closes (ADR-0024); invisible until then.
+    void WriteManagedState(ManagedId id, const void* data, uint32_t size) noexcept {
+        const ManagedObject* const object = mWorld.GetManaged().Resolve(id);
+        mCommands.WriteManagedState(object == nullptr ? EntityId::Invalid() : object->GetOwner(), id, data, size);
+    }
+    template <typename State>
+    void WriteManagedState(ManagedId id, const State& state) noexcept {
+        WriteManagedState(id, &state, static_cast<uint32_t>(sizeof(State)));
     }
 
     [[nodiscard]] uint32_t GetPendingCommandCount() const noexcept { return mCommands.GetCommandCount(); }

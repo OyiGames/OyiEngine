@@ -42,6 +42,7 @@ struct WorldFileSummary {
     uint32_t mEntityCount    = 0; ///< alive entities
     uint32_t mPrototypeCount = 0; ///< entities marked Prototype (ADR-0024)
     uint32_t mLockedCount    = 0; ///< entities marked Locked
+    uint32_t mManagedCount   = 0; ///< saved managed objects (ADR-0024: the typed ones)
     std::pmr::vector<Component> mComponents;
     std::pmr::vector<Archetype> mArchetypes;
 };

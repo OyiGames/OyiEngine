@@ -61,6 +61,12 @@ struct OYI_COMPONENT() BrainRef {
     oyi::ecs::ManagedId mObject{};
 };
 
+/// The state block of the tests' managed Brain (ADR-0024): what tools see and world files keep.
+struct OYI_STRUCT() BrainState {
+    uint32_t mUpdates = 0;
+    float mSawPrevX   = -2.0f;
+};
+
 /// Messages are plain OYI_STRUCT records.
 struct OYI_STRUCT() Damage {
     oyi::ecs::EntityId mSource{};

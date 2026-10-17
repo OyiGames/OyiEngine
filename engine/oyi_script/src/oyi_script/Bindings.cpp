@@ -5,6 +5,7 @@
 #include <oyi_ecs/ComponentRegistry.h>
 #include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Firewall.h>
+#include <oyi_ecs/ManagedObject.h>
 #include <oyi_ecs/Message.h>
 #include <oyi_ecs/Resource.h>
 #include <oyi_ecs/World.h>
@@ -37,6 +38,8 @@ using ecs::ComponentMask;
 using ecs::ComponentTypeIndex;
 using ecs::EntityId;
 using ecs::FirewallWindow;
+using ecs::ManagedId;
+using ecs::ManagedTypeInfo;
 using ecs::MessageTypeIndex;
 using ecs::PendingEntity;
 
@@ -118,6 +121,16 @@ void PushPending(lua_State* state, PendingEntity pending) noexcept {
         luaL_argerror(state, index, "unknown message type");
     }
     return type;
+}
+
+/// A managed type handle (oyi.managed): the index into the world's managed type registry.
+[[nodiscard]] const ManagedTypeInfo& CheckManaged(lua_State* state, int index) {
+    const std::span<const ManagedTypeInfo* const> types = VmOf(state).GetWorld().GetManagedTypes().GetAll();
+    const int value                                     = luaL_checkinteger(state, index);
+    if (value < 0 || static_cast<size_t>(value) >= types.size()) {
+        luaL_argerror(state, index, "unknown managed type");
+    }
+    return *types[static_cast<size_t>(value)];
 }
 
 /// An array table of component type indices at `index`.
@@ -387,6 +400,49 @@ int Message(lua_State* state) {
     return 1;
 }
 
+/// oyi.managed(name) -> managed type handle   (the state block's fully qualified name)
+int Managed(lua_State* state) {
+    const char* const name                              = luaL_checkstring(state, 1);
+    const std::span<const ManagedTypeInfo* const> types = VmOf(state).GetWorld().GetManagedTypes().GetAll();
+    for (size_t i = 0; i < types.size(); ++i) {
+        if (types[i]->GetName() == name) {
+            lua_pushinteger(state, static_cast<int>(i));
+            return 1;
+        }
+    }
+    luaL_error(state, "oyi: unknown managed type %s", name);
+}
+
+/// oyi.state(entity, managed) -> table | nil   (the live state block of the owner's object)
+int State(lua_State* state) {
+    const EntityId entity                  = CheckEntity(state, 1);
+    const ManagedTypeInfo& info            = CheckManaged(state, 2);
+    const FirewallWindow& window           = WindowOf(state);
+    const std::span<const std::byte> bytes = window.GetManagedState(window.FindManaged(entity, info.GetTypeId()));
+    if (bytes.empty()) {
+        lua_pushnil(state);
+        return 1;
+    }
+    PushRecord(state, VmOf(state), *info.mState, bytes.data());
+    return 1;
+}
+
+/// oyi.set_state(entity, managed, table)   deferred; fields absent from the table keep their value
+int SetState(lua_State* state) {
+    const EntityId entity                  = CheckEntity(state, 1);
+    const ManagedTypeInfo& info            = CheckManaged(state, 2);
+    FirewallWindow& window                 = WindowOf(state);
+    const ManagedId id                     = window.FindManaged(entity, info.GetTypeId());
+    const std::span<const std::byte> bytes = window.GetManagedState(id);
+    if (bytes.empty()) {
+        luaL_error(state, "oyi: no managed object of %s on the entity", Key(info.GetName()).CStr());
+    }
+    std::array<std::byte, kRecordBufferSize> buffer{};
+    BuildRecord(state, VmOf(state), *info.mState, bytes.data(), 3, buffer);
+    window.WriteManagedState(id, buffer.data(), info.GetStateSize());
+    return 0;
+}
+
 /// oyi.is_alive(entity) -> bool
 int IsAlive(lua_State* state) {
     lua_pushboolean(state, WindowOf(state).IsAlive(CheckEntity(state, 1)) ? 1 : 0);
@@ -519,8 +575,11 @@ int EntityToString(lua_State* state) {
     return 1;
 }
 
-constexpr std::array<luaL_Reg, 16> kLibrary{{{.name = "component", .func = &Component},
+constexpr std::array<luaL_Reg, 19> kLibrary{{{.name = "component", .func = &Component},
                                              {.name = "message", .func = &Message},
+                                             {.name = "managed", .func = &Managed},
+                                             {.name = "state", .func = &State},
+                                             {.name = "set_state", .func = &SetState},
                                              {.name = "is_alive", .func = &IsAlive},
                                              {.name = "has", .func = &Has},
                                              {.name = "get", .func = &Get},
