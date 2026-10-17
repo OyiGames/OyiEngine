@@ -138,6 +138,14 @@ public:
     /// returns (the window's own sync point). Fails with InvalidArgument without a function.
     [[nodiscard]] core::Result RunWindow(WindowFunction function, void* data) noexcept;
 
+    /// A window the schedule opens after every sync point (each phase's, and every explicit or
+    /// per-phase window's), before the snapshot capture: the hook of a layer that finishes what a
+    /// sync point began (ADR-0024: the object layer creates managed objects, runs lifecycle calls
+    /// and sends Spawned / Despawning here). What it records is applied right after it returns,
+    /// without opening the hook again. One per schedule; nullptr removes it.
+    void SetSyncHook(WindowFunction function, void* data) noexcept;
+    [[nodiscard]] uint32_t GetSyncHookRunCount() const noexcept { return mHookRuns; }
+
 private:
     struct Window {
         WindowFunction mFunction = nullptr;
@@ -161,6 +169,7 @@ private:
     void RouteOutbox(MessageBuffer& outbox) noexcept;
     void ValidateAccesses(Phase phase) noexcept;
     void RefreshQueries(Phase phase) noexcept;
+    void RunSyncHook() noexcept;
 
     core::Allocator& mAllocator;
     World& mWorld;
@@ -174,6 +183,10 @@ private:
     World::ReplayStats mLastWindowReplay;
     CommandBuffer mWindowCommands;
     MessageBuffer mWindowOutbox;
+    Window mHook;
+    CommandBuffer mHookCommands;
+    MessageBuffer mHookOutbox;
+    uint32_t mHookRuns = 0;
     std::array<Window, kPhaseCount> mWindows{};
     std::pmr::vector<uint8_t> mReach; ///< count x count: a is ordered before b, kept from Build
     std::pmr::vector<AccessViolation> mViolations;

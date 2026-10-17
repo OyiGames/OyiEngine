@@ -24,6 +24,7 @@ void CommandBuffer::Record(Op op, ComponentTypeIndex type, EntityId entity, Pend
                                 .mType          = type,
                                 .mEntity        = entity,
                                 .mPending       = pending,
+                                .mReference     = PendingEntity{},
                                 .mPayloadOffset = payloadOffset,
                                 .mPayloadSize   = payloadSize});
 }
@@ -96,6 +97,40 @@ void CommandBuffer::WriteManagedState(EntityId owner, ManagedId id, const void* 
     const uint32_t offset = StorePayload(data, size);
     Record(Op::ManagedState, ComponentTypeIndex::Invalid(), owner, PendingEntity{}, offset, size, false);
     mCommands.back().mManaged = id;
+}
+
+void CommandBuffer::LinkEntity(EntityId target, ComponentTypeIndex type, uint32_t offset,
+                               PendingEntity referenced) noexcept {
+    Record(Op::Link, type, target, PendingEntity{}, offset, 0, false);
+    mCommands.back().mReference = referenced;
+}
+
+void CommandBuffer::LinkEntity(PendingEntity target, ComponentTypeIndex type, uint32_t offset,
+                               PendingEntity referenced) noexcept {
+    Record(Op::Link, type, EntityId::Invalid(), target, offset, 0, false);
+    mCommands.back().mReference = referenced;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+void CommandBuffer::RecordCall(EntityId entity, PendingEntity pending, CommandCallback function, void* data,
+                               const void* payload, uint32_t size) noexcept {
+    const CallHeader header{.mFunction = function, .mData = data};
+    const uint32_t offset = StorePayload(&header, static_cast<uint32_t>(sizeof(header)));
+    if (size != 0) {
+        (void)StorePayload(payload, size);
+    }
+    Record(Op::Call, ComponentTypeIndex::Invalid(), entity, pending, offset,
+           static_cast<uint32_t>(sizeof(header)) + size, false);
+}
+
+void CommandBuffer::Call(EntityId target, CommandCallback function, void* data, const void* payload,
+                         uint32_t size) noexcept {
+    RecordCall(target, PendingEntity{}, function, data, payload, size);
+}
+
+void CommandBuffer::Call(PendingEntity target, CommandCallback function, void* data, const void* payload,
+                         uint32_t size) noexcept {
+    RecordCall(EntityId::Invalid(), target, function, data, payload, size);
 }
 
 void CommandBuffer::SetMark(EntityId entity, EntityMark mark) noexcept {

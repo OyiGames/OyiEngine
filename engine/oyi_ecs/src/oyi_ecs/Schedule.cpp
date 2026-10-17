@@ -131,6 +131,8 @@ Schedule::Schedule(core::Allocator& allocator, World& world) noexcept
     , mPhaseBuffers(&mResource)
     , mWindowCommands(allocator)
     , mWindowOutbox(allocator)
+    , mHookCommands(allocator)
+    , mHookOutbox(allocator)
     , mReach(&mResource)
     , mViolations(&mResource) {}
 
@@ -547,6 +549,7 @@ core::Result Schedule::EndPhase(Phase phase, uint32_t versionsUsed) noexcept {
     // the sync point stamps its own writes.
     mWorld.AdvanceVersion(versionsUsed);
     mLastReplay = mWorld.SyncPoint(std::span<CommandBuffer* const>{mPhaseBuffers});
+    RunSyncHook();
     if (mSnapshot != nullptr && phase == mSnapshotPhase) {
         mSnapshot->Capture(mWorld, mSnapshotTypes);
     }
@@ -573,7 +576,26 @@ core::Result Schedule::RunWindow(WindowFunction function, void* data) noexcept {
     RouteOutbox(mWindowOutbox);
     std::array<CommandBuffer*, 1> buffers{&mWindowCommands};
     mLastWindowReplay = mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
+    RunSyncHook();
     return {};
+}
+
+void Schedule::SetSyncHook(WindowFunction function, void* data) noexcept {
+    mHook = Window{.mFunction = function, .mData = data};
+}
+
+void Schedule::RunSyncHook() noexcept {
+    if (mHook.mFunction == nullptr) {
+        return;
+    }
+    {
+        FirewallWindow window(mWorld, mSnapshot, mHookCommands, mHookOutbox, mHook.mData);
+        mHook.mFunction(window);
+    }
+    ++mHookRuns;
+    RouteOutbox(mHookOutbox);
+    std::array<CommandBuffer*, 1> buffers{&mHookCommands};
+    (void)mWorld.SyncPoint(std::span<CommandBuffer* const>{buffers});
 }
 
 const AccessLog& Schedule::GetAccessLog(SystemId system) const noexcept {

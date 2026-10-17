@@ -33,7 +33,7 @@ scripts/                                 CI 跑的规范检查
 docs/                                    CONTRIBUTING、THIRD_PARTY（英文 + zh-CN）
 ```
 
-模块依赖只许向下：`platform <- core <- job <- ecs <- transform <- script / physics / net`。
+模块依赖只许向下：`platform <- core <- job <- ecs <- transform / object <- script / physics / net`。
 
 ## 许可
 
