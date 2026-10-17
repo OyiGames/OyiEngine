@@ -132,7 +132,8 @@ void ObjectLayer::FinishSpawns(ecs::FirewallWindow& window) noexcept {
             if (reference == nullptr) {
                 continue; // the clone lost the component: not a factory-made row any more
             }
-            ecs::ManagedObject* const object = binding.mType->mCreate(mWorld.GetManaged().GetAllocator());
+            ecs::ManagedObject* const object =
+                binding.mType->mCreate(mWorld.GetManaged().GetAllocator(), *binding.mType);
             if (object == nullptr) {
                 continue;
             }

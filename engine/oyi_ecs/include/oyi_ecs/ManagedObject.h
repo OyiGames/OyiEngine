@@ -67,7 +67,10 @@ struct ManagedTypeInfo {
     std::span<const core::ComponentInfo* const> mWrites;
     std::span<const core::ComponentInfo* const> mReceives;
     std::span<const core::ComponentInfo* const> mSends;
-    class ManagedObject* (*mCreate)(core::Allocator& allocator) noexcept = nullptr;
+    /// Builds an object of the type (world files, the object factory); `self` is this info, so a
+    /// type defined outside C++ (a Luau module) finds its definition through mUserData.
+    class ManagedObject* (*mCreate)(core::Allocator& allocator, const ManagedTypeInfo& self) noexcept = nullptr;
+    void* mUserData                                                                                   = nullptr;
 
     [[nodiscard]] core::TypeId GetTypeId() const noexcept { return mState->mTypeId; }
     [[nodiscard]] std::string_view GetName() const noexcept { return mState->mName; }
@@ -124,7 +127,10 @@ template <typename Derived, typename State, typename AccessSpec>
         .mWrites   = AccessSpec::Writes::kInfos,
         .mReceives = AccessSpec::Receives::kInfos,
         .mSends    = AccessSpec::Sends::kInfos,
-        .mCreate   = [](core::Allocator& allocator) noexcept -> ManagedObject* { return allocator.New<Derived>(); },
+        .mCreate   = [](core::Allocator& allocator, const ManagedTypeInfo& /*self*/) noexcept -> ManagedObject* {
+            return allocator.New<Derived>();
+        },
+        .mUserData = nullptr,
     };
 }
 

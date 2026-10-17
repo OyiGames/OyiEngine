@@ -196,6 +196,22 @@ public:
         mOutbox.Send(type, target, value);
     }
 
+    /// The same from `size` bytes already laid out as the message type (scripts, tools).
+    void SendBytes(MessageTypeIndex type, EntityId target, const void* data, uint32_t size) noexcept {
+        OYI_ASSERT(CanSend(type), "system sends a message type it did not declare");
+        mOutbox.Send(type, target, data, size);
+    }
+
+    /// The delivered messages of `type` as targets and raw payload bytes (scripts, tools).
+    [[nodiscard]] std::span<const EntityId> ReceivedTargets(MessageTypeIndex type) const noexcept {
+        OYI_ASSERT(CanReceive(type), "system reads a message type it did not declare");
+        return mInbox.Targets(type);
+    }
+    [[nodiscard]] std::span<const std::byte> ReceivedBytes(MessageTypeIndex type) const noexcept {
+        OYI_ASSERT(CanReceive(type), "system reads a message type it did not declare");
+        return mInbox.Payload(type);
+    }
+
     /// The messages of `type` delivered since this system last ran.
     template <typename T>
     [[nodiscard]] ReceivedMessages<T> Received(MessageTypeIndex type) const noexcept {

@@ -16,6 +16,25 @@ export type MessageType = number
 -- A managed type (ADR-0024), named by its state block; scripts see the state block only.
 export type ManagedType = number
 
+-- What oyi.managed_type declares: the component and message types update may touch.
+export type ManagedAccess = {
+    reads: { ComponentType }?,
+    writes: { ComponentType }?,
+    receives: { MessageType }?,
+    sends: { MessageType }?,
+}
+
+-- The restricted context of a scripted managed object's update(self, ctx): only the declared sets.
+export type ManagedContext = {
+    get: (type: ComponentType) -> any?,
+    prev: (type: ComponentType) -> any?,
+    set: (type: ComponentType, value: { [string]: any }) -> (),
+    received: (type: MessageType) -> { any },
+    send: (type: MessageType, target: Entity?, value: { [string]: any }) -> (),
+    owner: () -> Entity,
+    env: () -> Environment,
+}
+
 export type Environment = {
     frame: number,
     tick: number,
@@ -29,6 +48,9 @@ declare oyi: {
     component: (name: string) -> ComponentType,
     message: (name: string) -> MessageType,
     managed: (name: string) -> ManagedType,
+    -- Declares a managed type implemented by this module (its update(self, ctx), optional
+    -- on_spawned(self, owner) / on_despawning(self, owner)); only at module top level.
+    managed_type: (stateName: string, access: ManagedAccess) -> ManagedType,
     env: () -> Environment,
 
     -- Everything below needs an open firewall window: the function a Call runs in.

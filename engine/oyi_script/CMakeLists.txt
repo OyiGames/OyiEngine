@@ -2,6 +2,7 @@ find_package(unofficial-luau CONFIG REQUIRED)
 
 oyi_add_module(script
     PUBLIC_HEADERS
+        include/oyi_script/ScriptManaged.h
         include/oyi_script/ScriptVm.h
     PRIVATE_HEADERS
         src/oyi_script/detail/Bindings.h
