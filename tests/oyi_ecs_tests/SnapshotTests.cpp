@@ -169,3 +169,14 @@ TEST_CASE("the schedule captures a snapshot at the end of the chosen phase", "[e
     REQUIRE(schedule.RunPhaseSerial(Phase::FixedSimulation).has_value());
     CHECK(f.mSnapshot.Get<Position>(entity, f.mPosition)->mX == 2.0f); // capture disabled
 }
+
+TEST_CASE("a snapshot skips prototype entities", "[ecs][snapshot][object]") {
+    Fixture f;
+    const EntityId prototype                      = *f.mWorld.CreatePrototype(MaskOf({f.mPosition}));
+    f.mWorld.GetForWrite<Position>(prototype)->mX = 5.0f;
+    const EntityId instance                       = *f.mWorld.CloneEntity(prototype);
+    f.mSnapshot.Capture(f.mWorld, MaskOf({f.mPosition}));
+    CHECK(f.mSnapshot.Get<Position>(prototype, f.mPosition) == nullptr);
+    REQUIRE(f.mSnapshot.Get<Position>(instance, f.mPosition) != nullptr);
+    CHECK(f.mSnapshot.Get<Position>(instance, f.mPosition)->mX == 5.0f);
+}

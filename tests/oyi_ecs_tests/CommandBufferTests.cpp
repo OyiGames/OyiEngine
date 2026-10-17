@@ -27,6 +27,7 @@ using oyi::ecs::CommandBuffer;
 using oyi::ecs::ComponentMask;
 using oyi::ecs::ComponentTypeIndex;
 using oyi::ecs::EntityId;
+using oyi::ecs::EntityMark;
 using oyi::ecs::PendingEntity;
 using oyi::ecs::World;
 using namespace oyi::ecs_fixture;
@@ -244,4 +245,42 @@ TEST_CASE("commands recorded by parallel jobs replay to the same result every ti
     for (int round = 0; round < 5; ++round) {
         runOnce();
     }
+}
+
+TEST_CASE("clones and marks replay like any other command", "[ecs][commands][object]") {
+    Fixture f;
+    const EntityId prototype                          = *f.mWorld.CreatePrototype(MaskOf({f.mPosition, f.mHealth}));
+    f.mWorld.GetForWrite<Health>(prototype)->mCurrent = 42;
+    const EntityId plain                              = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    const EntityId dead                               = *f.mWorld.CreateEntity(MaskOf({f.mPosition}));
+    REQUIRE(f.mWorld.DestroyEntity(dead).has_value());
+
+    CommandBuffer commands(f.mAllocator);
+    const PendingEntity instance = commands.CloneEntity(prototype);
+    commands.Set(instance, f.mPosition, Position{.mX = 1.0f, .mY = 2.0f, .mZ = 3.0f}); // overrides apply after cloning
+    commands.AddComponent(instance, f.mVelocity);                                      // locked: skipped
+    commands.SetMark(plain, EntityMark::Locked);
+    commands.AddComponent(plain, f.mVelocity);              // locked by then: skipped
+    const PendingEntity ghost = commands.CloneEntity(dead); // source is dead: skipped
+    commands.Set(ghost, f.mPosition, Position{});           // and so is this
+    CHECK(commands.GetCreateCount() == 2);
+
+    const std::array<CommandBuffer*, 1> buffers{&commands};
+    const World::ReplayStats stats = f.mWorld.ReplayCommands(std::span<CommandBuffer* const>{buffers});
+    CHECK(stats.mApplied == 3);
+    CHECK(stats.mSkipped == 4);
+
+    uint32_t locked = 0;
+    f.mWorld.ForEachChunk(MaskOf({f.mHealth}), ComponentMask{}, [&](oyi::ecs::ChunkView& view) {
+        for (const EntityId entity : view.GetEntities()) {
+            locked += f.mWorld.GetMark(entity) == EntityMark::Locked ? 1 : 0;
+            CHECK(f.mWorld.Get<Health>(entity)->mCurrent == 42);
+            CHECK(f.mWorld.Get<Position>(entity)->mY == 2.0f);
+            CHECK_FALSE(f.mWorld.HasComponent(entity, f.mVelocity));
+        }
+    });
+    CHECK(locked == 1);
+    CHECK(f.mWorld.GetMark(plain) == EntityMark::Locked);
+    CHECK_FALSE(f.mWorld.HasComponent(plain, f.mVelocity));
+    CHECK(f.mWorld.GetEntityCount() == 3); // prototype, plain, instance
 }

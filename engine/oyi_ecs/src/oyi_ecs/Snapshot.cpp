@@ -48,7 +48,7 @@ void Snapshot::Capture(const World& world, const ComponentMask& types) noexcept 
 
     for (uint32_t index = 0; index < world.GetArchetypeCount(); ++index) {
         const Archetype& archetype = world.GetArchetype(index);
-        if (!archetype.GetMask().Intersects(types)) {
+        if (archetype.IsPrototype() || !archetype.GetMask().Intersects(types)) {
             continue;
         }
         for (uint32_t chunk = 0; chunk < archetype.GetChunkCount(); ++chunk) {

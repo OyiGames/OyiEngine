@@ -30,7 +30,7 @@ namespace oyi::ecs {
 namespace {
 
 constexpr std::array<char, 4> kMagic{'O', 'Y', 'I', 'W'};
-constexpr uint32_t kFormatVersion = 1;
+constexpr uint32_t kFormatVersion = 2; ///< v2 (ADR-0024): entity marks, prototype archetypes
 
 /// Appends plain values to a byte vector.
 class Writer {
@@ -117,6 +117,7 @@ void World::Clear() noexcept {
         mAllocator.Delete(archetype);
     }
     mArchetypes.clear();
+    mMarks.clear();
     mEntities.Clear();
 }
 
@@ -151,6 +152,9 @@ core::Result World::Save(std::pmr::vector<std::byte>& out) const noexcept {
     for (uint32_t index = 0; index < capacity; ++index) {
         writer.Put(static_cast<uint8_t>(mEntities.IsIndexAlive(index) ? 1 : 0));
     }
+    for (uint32_t index = 0; index < capacity; ++index) {
+        writer.Put(static_cast<uint8_t>(index < mMarks.size() ? mMarks[index] : EntityMark::None));
+    }
 
     // Archetypes and their chunks, byte for byte. Transient columns (ADR-0024) are written as
     // their defaults: the file never carries run-time state that a system rebuilds anyway.
@@ -158,6 +162,7 @@ core::Result World::Save(std::pmr::vector<std::byte>& out) const noexcept {
     writer.Put(static_cast<uint32_t>(mArchetypes.size()));
     for (const Archetype* const archetype : mArchetypes) {
         const ChunkLayout& layout = archetype->GetLayout();
+        writer.Put(static_cast<uint8_t>(archetype->IsPrototype() ? 1 : 0));
         writer.Put(archetype->GetMask().Count());
         archetype->GetMask().ForEach([&writer](ComponentTypeIndex type) { writer.Put(type.mValue); });
         writer.Put(archetype->GetChunkCount());
@@ -256,6 +261,11 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
     if ((capacity != 0 && (generations == nullptr || alive == nullptr))) {
         return Corrupt("World::Load: truncated entity table");
     }
+    const auto* const marks =
+        reinterpret_cast<const uint8_t*>(reader.Take(capacity)); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (capacity != 0 && marks == nullptr) {
+        return Corrupt("World::Load: truncated entity table");
+    }
     std::pmr::vector<uint32_t> generationTable(&mResource);
     std::pmr::vector<uint8_t> aliveTable(&mResource);
     generationTable.resize(capacity);
@@ -265,7 +275,8 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
         std::memcpy(aliveTable.data(), alive, capacity);
     }
     for (uint32_t index = 0; index < capacity; ++index) {
-        if (generationTable[index] == 0 || aliveTable[index] > 1) {
+        if (generationTable[index] == 0 || aliveTable[index] > 1 ||
+            marks[index] > static_cast<uint8_t>(EntityMark::Locked) || (aliveTable[index] == 0 && marks[index] != 0)) {
             return Corrupt("World::Load: invalid entity table");
         }
     }
@@ -276,10 +287,15 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
     }
     // Everything checked up to here is cheap to undo; from now on failures leave the world cleared.
     mEntities.Restore(generationTable, aliveTable);
+    mMarks.assign(capacity, EntityMark::None);
+    for (uint32_t index = 0; index < capacity; ++index) {
+        mMarks[index] = static_cast<EntityMark>(marks[index]);
+    }
     uint32_t located = 0;
     for (uint32_t a = 0; a < archetypeCount; ++a) {
+        uint8_t prototype  = 0;
         uint32_t typeCount = 0;
-        if (!reader.Get(typeCount) || typeCount > kMaxComponentTypes) {
+        if (!reader.Get(prototype) || prototype > 1 || !reader.Get(typeCount) || typeCount > kMaxComponentTypes) {
             Clear();
             return Corrupt("World::Load: truncated archetype");
         }
@@ -292,7 +308,7 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
             }
             mask.Set(ComponentTypeIndex{.mValue = value});
         }
-        const core::Expected<Archetype*> created = GetOrCreateArchetype(mask);
+        const core::Expected<Archetype*> created = GetOrCreateArchetype(mask, prototype != 0);
         if (!created.has_value()) {
             Clear();
             return core::Fail(created.error().mCode, created.error().mMessage);
@@ -321,7 +337,8 @@ core::Result World::Load(std::span<const std::byte> data) noexcept {
             }
             const std::span<const EntityId> entities = archetype.GetEntities(c);
             for (uint32_t row = 0; row < entities.size(); ++row) {
-                if (!mEntities.IsAlive(entities[row])) {
+                if (!mEntities.IsAlive(entities[row]) ||
+                    (GetMark(entities[row]) == EntityMark::Prototype) != archetype.IsPrototype()) {
                     Clear();
                     return Corrupt("World::Load: a chunk row names an entity the table does not know");
                 }
@@ -382,9 +399,17 @@ core::Result DescribeSavedWorld(std::span<const std::byte> data, WorldFileSummar
     if (out.mEntityCapacity != 0 && alive == nullptr) {
         return Corrupt("world file: truncated entity table");
     }
-    out.mEntityCount = 0;
+    const std::byte* const marks = reader.Take(out.mEntityCapacity);
+    if (out.mEntityCapacity != 0 && marks == nullptr) {
+        return Corrupt("world file: truncated entity table");
+    }
+    out.mEntityCount    = 0;
+    out.mPrototypeCount = 0;
+    out.mLockedCount    = 0;
     for (uint32_t index = 0; index < out.mEntityCapacity; ++index) {
         out.mEntityCount += alive[index] != std::byte{0} ? 1 : 0;
+        out.mPrototypeCount += marks[index] == std::byte{1} ? 1 : 0;
+        out.mLockedCount += marks[index] == std::byte{2} ? 1 : 0;
     }
     uint32_t archetypeCount = 0;
     if (!reader.Get(archetypeCount)) {
@@ -394,10 +419,12 @@ core::Result DescribeSavedWorld(std::span<const std::byte> data, WorldFileSummar
     uint32_t located = 0;
     for (uint32_t a = 0; a < archetypeCount; ++a) {
         WorldFileSummary::Archetype archetype{.mTypes = std::pmr::vector<uint16_t>(&out.mResource)};
+        uint8_t prototype  = 0;
         uint32_t typeCount = 0;
-        if (!reader.Get(typeCount) || typeCount > kMaxComponentTypes) {
+        if (!reader.Get(prototype) || prototype > 1 || !reader.Get(typeCount) || typeCount > kMaxComponentTypes) {
             return Corrupt("world file: truncated archetype");
         }
+        archetype.mPrototype = prototype != 0;
         for (uint32_t t = 0; t < typeCount; ++t) {
             uint16_t value = 0;
             if (!reader.Get(value) || value >= componentCount) {
@@ -429,13 +456,19 @@ core::Expected<EntityId> World::CloneEntity(EntityId source) noexcept {
         return core::Fail(core::ErrorCode::NotFound, "World::CloneEntity: the source is not alive");
     }
     const EntityLocation sourceRow         = mEntities.GetLocation(source);
+    const bool fromPrototype               = GetMark(source) == EntityMark::Prototype;
     const core::Expected<EntityId> created = CreateEntity(mArchetypes[sourceRow.mArchetype]->GetMask());
     if (!created.has_value()) {
         return created;
     }
-    // Creating never moves existing rows, so the source location still holds.
-    Archetype& archetype = *mArchetypes[sourceRow.mArchetype];
-    archetype.CopySharedComponents(archetype, sourceRow, mEntities.GetLocation(*created));
+    // Creating never moves existing rows, so the source location still holds. An instance of a
+    // prototype lands in the ordinary archetype of the same mask (ADR-0024) and is locked.
+    const Archetype& sourceArchetype = *mArchetypes[sourceRow.mArchetype];
+    const EntityLocation targetRow   = mEntities.GetLocation(*created);
+    mArchetypes[targetRow.mArchetype]->CopySharedComponents(sourceArchetype, sourceRow, targetRow);
+    if (fromPrototype) {
+        RememberMark(*created, EntityMark::Locked);
+    }
     return created;
 }
 

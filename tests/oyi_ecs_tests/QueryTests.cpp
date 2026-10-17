@@ -2,6 +2,7 @@
 #include <oyi_ecs/ChunkView.h>
 #include <oyi_ecs/ComponentMask.h>
 #include <oyi_ecs/ComponentRegistry.h>
+#include <oyi_ecs/Entity.h>
 #include <oyi_ecs/Query.h>
 #include <oyi_ecs/World.h>
 #include <oyi_ecs_fixture/Components.gen.h> // IWYU pragma: keep
@@ -68,4 +69,16 @@ TEST_CASE("an empty query matches every archetype", "[ecs][query]") {
     Query everything(f.mAllocator, ComponentMask{}, ComponentMask{});
     CHECK(everything.GetMatches(f.mWorld).size() == 2);
     CHECK(everything.CountEntities(f.mWorld) == 2);
+}
+
+TEST_CASE("a query never matches a prototype archetype", "[ecs][query][object]") {
+    Fixture f;
+    Query movable(f.mAllocator, MaskOf({f.mPosition, f.mVelocity}), ComponentMask{});
+    const oyi::ecs::EntityId prototype = *f.mWorld.CreatePrototype(MaskOf({f.mPosition, f.mVelocity}));
+    CHECK(movable.GetMatches(f.mWorld).empty());
+    CHECK(movable.CountEntities(f.mWorld) == 0);
+    (void)*f.mWorld.CloneEntity(prototype);
+    (void)*f.mWorld.CloneEntity(prototype);
+    CHECK(movable.GetMatches(f.mWorld).size() == 1);
+    CHECK(movable.CountEntities(f.mWorld) == 2);
 }
