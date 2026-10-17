@@ -59,6 +59,23 @@ struct OYI_COMPONENT() Nested {
     std::uint8_t mValue = 0;
 };
 
+struct OYI_COMPONENT(Transient, Replicated) BadTransient {
+    float mValue = 0.0f;
+};
+
+struct OYI_COMPONENT(Description = Unquoted) BadDescription {
+    float mValue = 0.0f;
+};
+
+struct OYI_COMPONENT() BadToolOptions {
+    OYI_FIELD(Asset = Mesh) std::uint64_t mNotAnAsset = 0;
+    OYI_FIELD(Range = 0..1) bool mRangeOnBool = false;
+    std::uint8_t mPad[3] = {};
+    OYI_FIELD(Range = 5..1) float mInverted = 0.0f;
+    OYI_FIELD(Step = -1) float mNegativeStep = 0.0f;
+    OYI_FIELD(Description = plain) float mBareDescription = 0.0f;
+};
+
 } // namespace oyi::golden
 
 // clang-format on

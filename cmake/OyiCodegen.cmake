@@ -167,10 +167,13 @@ function(oyi_target_codegen target)
             VERBATIM
         )
         list(APPEND outputs "${gen_h}")
+        list(APPEND json_outputs "${gen_json}")
     endforeach()
     target_sources(${target} PUBLIC
         FILE_SET HEADERS
         BASE_DIRS "${gen_root}"
         FILES ${outputs}
     )
+    # The schema JSON files of this target, for oyi_add_module to collect into the build's merged schema.
+    set(OYI_CODEGEN_JSON_FILES ${json_outputs} PARENT_SCOPE)
 endfunction()

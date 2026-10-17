@@ -24,6 +24,11 @@ export type Everything = {
     mExtent: Extent,
     mOther: Handle,
     mSamples: { number },
+    mWeight: number,
+    mCache: number,
+    mSkeleton: Handle,
+    mLimits: { number },
+    mSigned: number,
 }
 export type EverythingPartial = {
     mFlag: boolean?,
@@ -37,6 +42,18 @@ export type EverythingPartial = {
     mExtent: Extent?,
     mOther: Handle?,
     mSamples: { number }?,
+    mWeight: number?,
+    mCache: number?,
+    mSkeleton: Handle?,
+    mLimits: { number }?,
+    mSigned: number?,
+}
+
+export type Scratch = {
+    mValue: number,
+}
+export type ScratchPartial = {
+    mValue: number?,
 }
 
 export type Marker = {}

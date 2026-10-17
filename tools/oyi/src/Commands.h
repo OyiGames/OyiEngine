@@ -42,6 +42,9 @@ int RunVersion(std::span<const std::string_view> args);
 /// The schema hash of this build: every engine module that declares components, in dependency
 /// order (what `--version --json` prints and what the RPC Welcome carries).
 [[nodiscard]] unsigned long long GetBuildSchemaHash() noexcept;
+
+/// The build's merged schema JSON (oyi_schema.json, ADR-0024), embedded at build time.
+[[nodiscard]] std::string_view GetBuildSchemaJson() noexcept;
 int RunWorld(std::span<const std::string_view> args);
 int RunAsset(std::span<const std::string_view> args);
 int RunSchema(std::span<const std::string_view> args);

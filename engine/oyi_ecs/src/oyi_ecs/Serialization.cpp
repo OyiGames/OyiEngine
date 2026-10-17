@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <expected>
+#include <memory_resource> // IWYU pragma: keep (libc++ sees no use, the MSVC STL needs it)
 #include <span>
 #include <string>
 #include <string_view>
@@ -151,15 +152,44 @@ core::Result World::Save(std::pmr::vector<std::byte>& out) const noexcept {
         writer.Put(static_cast<uint8_t>(mEntities.IsIndexAlive(index) ? 1 : 0));
     }
 
-    // Archetypes and their chunks, byte for byte.
+    // Archetypes and their chunks, byte for byte. Transient columns (ADR-0024) are written as
+    // their defaults: the file never carries run-time state that a system rebuilds anyway.
+    std::pmr::vector<std::byte> scratch(out.get_allocator());
     writer.Put(static_cast<uint32_t>(mArchetypes.size()));
     for (const Archetype* const archetype : mArchetypes) {
+        const ChunkLayout& layout = archetype->GetLayout();
         writer.Put(archetype->GetMask().Count());
         archetype->GetMask().ForEach([&writer](ComponentTypeIndex type) { writer.Put(type.mValue); });
         writer.Put(archetype->GetChunkCount());
+        bool hasTransient = false;
+        archetype->GetMask().ForEach([&](ComponentTypeIndex type) {
+            hasTransient = hasTransient || HasFlag(mComponents.GetInfo(type).mFlags, core::ComponentFlags::Transient);
+        });
         for (uint32_t chunk = 0; chunk < archetype->GetChunkCount(); ++chunk) {
-            writer.Put(archetype->GetChunk(chunk).mCount);
-            writer.PutBytes(archetype->GetChunk(chunk).mData, archetype->GetLayout().GetChunkSize());
+            const auto& data = archetype->GetChunk(chunk);
+            writer.Put(data.mCount);
+            if (!hasTransient) {
+                writer.PutBytes(data.mData, layout.GetChunkSize());
+                continue;
+            }
+            scratch.assign(data.mData, data.mData + layout.GetChunkSize());
+            for (const ColumnLayout& column : layout.GetColumns()) {
+                const core::ComponentInfo& info = mComponents.GetInfo(column.mType);
+                if (!HasFlag(info.mFlags, core::ComponentFlags::Transient)) {
+                    continue;
+                }
+                for (uint32_t row = 0; row < data.mCount; ++row) {
+                    std::memcpy(scratch.data() + column.mOffset + (static_cast<size_t>(row) * column.mElementSize),
+                                info.mDefault, info.mSize);
+                }
+            }
+            for (const ChunkComponentLayout& component : layout.GetChunkComponents()) {
+                const core::ComponentInfo& info = mComponents.GetInfo(component.mType);
+                if (HasFlag(info.mFlags, core::ComponentFlags::Transient)) {
+                    std::memcpy(scratch.data() + component.mOffset, info.mDefault, info.mSize);
+                }
+            }
+            writer.PutBytes(scratch.data(), layout.GetChunkSize());
         }
     }
     return {};

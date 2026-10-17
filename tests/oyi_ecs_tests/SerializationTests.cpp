@@ -252,6 +252,25 @@ TEST_CASE("loading refuses the wrong world, the wrong schema and damaged files",
     }
 }
 
+TEST_CASE("transient components are saved as their defaults", "[ecs][serialization]") {
+    SystemAllocator allocator;
+    World world(allocator);
+    const ComponentTypeIndex position          = *world.GetComponents().Register<Position>();
+    const ComponentTypeIndex scratch           = *world.GetComponents().Register<Scratch>();
+    const EntityId entity                      = *world.CreateEntity(MaskOf({position, scratch}));
+    world.GetForWrite<Position>(entity)->mX    = 3.0f;
+    world.GetForWrite<Scratch>(entity)->mValue = 5.0f;
+    const std::pmr::vector<std::byte> bytes    = SaveOf(world);
+    CHECK(world.Get<Scratch>(entity)->mValue == 5.0f); // saving does not touch the live world
+
+    World loaded(allocator);
+    REQUIRE(loaded.GetComponents().Register<Position>().has_value());
+    REQUIRE(loaded.GetComponents().Register<Scratch>().has_value());
+    REQUIRE(loaded.Load(bytes).has_value());
+    CHECK(loaded.Get<Position>(entity)->mX == 3.0f);
+    CHECK(loaded.Get<Scratch>(entity)->mValue == 0.0f);
+}
+
 TEST_CASE("the schema hash follows the registered types", "[ecs][serialization]") {
     SystemAllocator allocator;
     World a(allocator);

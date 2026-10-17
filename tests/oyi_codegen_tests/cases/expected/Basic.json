@@ -1,7 +1,7 @@
 {
   "generator": "oyi_codegen 0.1.0",
   "header": "Basic.h",
-  "schemaHash": "0x0908fd8ddab9884c",
+  "schemaHash": "0xe76141769b9f6dba",
   "records": [
     {
       "name": "oyi::golden::Extent",
@@ -11,6 +11,7 @@
       "align": 4,
       "flags": [],
       "layoutHash": "0x3062be7fbc8adf58",
+      "description": "A width and a height",
       "fields": [
         {
           "name": "mWidth",
@@ -19,7 +20,8 @@
           "offset": 0,
           "size": 4,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 0
         },
         {
           "name": "mHeight",
@@ -28,7 +30,8 @@
           "offset": 4,
           "size": 4,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 0
         }
       ]
     },
@@ -36,12 +39,12 @@
       "name": "oyi::golden::Everything",
       "kind": "component",
       "typeId": "0xa82cbc2f5bc1dfd0",
-      "size": 64,
+      "size": 96,
       "align": 8,
       "flags": [
         "Replicated"
       ],
-      "layoutHash": "0x1da59e47f646a0f2",
+      "layoutHash": "0x9eaeba121be168f1",
       "fields": [
         {
           "name": "mFlag",
@@ -50,7 +53,8 @@
           "offset": 0,
           "size": 1,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": false
         },
         {
           "name": "mTiny",
@@ -59,7 +63,8 @@
           "offset": 1,
           "size": 1,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": -1
         },
         {
           "name": "mPad0",
@@ -79,7 +84,13 @@
           "count": 1,
           "flags": [],
           "typeName": "oyi::golden::Mode",
-          "typeId": "0x4d755dc13decb902"
+          "typeId": "0x4d755dc13decb902",
+          "default": "Off",
+          "enumerators": {
+            "Off": 0,
+            "On": 1
+          },
+          "underlying": "std::uint16_t"
         },
         {
           "name": "mCount",
@@ -88,7 +99,8 @@
           "offset": 8,
           "size": 4,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 0
         },
         {
           "name": "mRatio",
@@ -97,7 +109,8 @@
           "offset": 12,
           "size": 4,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 1.0
         },
         {
           "name": "mBig",
@@ -106,7 +119,8 @@
           "offset": 16,
           "size": 8,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 0
         },
         {
           "name": "mPrecise",
@@ -115,7 +129,8 @@
           "offset": 24,
           "size": 8,
           "count": 1,
-          "flags": []
+          "flags": [],
+          "default": 0.0
         },
         {
           "name": "mSpeed",
@@ -127,7 +142,8 @@
           "flags": [
             "Replicated"
           ],
-          "quantize": 0.5
+          "quantize": 0.5,
+          "default": 0.0
         },
         {
           "name": "mExtent",
@@ -159,6 +175,109 @@
           "size": 12,
           "count": 6,
           "flags": []
+        },
+        {
+          "name": "mWeight",
+          "type": "float",
+          "kind": "Float32",
+          "offset": 64,
+          "size": 4,
+          "count": 1,
+          "flags": [],
+          "default": 0.5,
+          "range": [
+            0.0,
+            1.0
+          ],
+          "step": 0.05,
+          "unit": "m",
+          "description": "Blend weight, with a \"quoted\" word"
+        },
+        {
+          "name": "mCache",
+          "type": "std::uint32_t",
+          "kind": "UInt32",
+          "offset": 68,
+          "size": 4,
+          "count": 1,
+          "flags": [
+            "ReadOnly"
+          ],
+          "default": 7
+        },
+        {
+          "name": "mSkeleton",
+          "type": "oyi::core::AssetId",
+          "kind": "Struct",
+          "offset": 72,
+          "size": 8,
+          "count": 1,
+          "flags": [],
+          "typeName": "oyi::core::AssetId",
+          "typeId": "0x8eae55c5e306772c",
+          "asset": "Skeleton"
+        },
+        {
+          "name": "mLimits",
+          "type": "std::int32_t",
+          "kind": "Int32",
+          "offset": 80,
+          "size": 8,
+          "count": 2,
+          "flags": [],
+          "default": [
+            -4,
+            4
+          ]
+        },
+        {
+          "name": "mSigned",
+          "type": "std::int8_t",
+          "kind": "Int8",
+          "offset": 88,
+          "size": 1,
+          "count": 1,
+          "flags": [],
+          "default": -3,
+          "range": [
+            -10.0,
+            10.0
+          ],
+          "unit": "m/s"
+        },
+        {
+          "name": "mPad1",
+          "type": "std::uint8_t",
+          "kind": "Padding",
+          "offset": 89,
+          "size": 7,
+          "count": 7,
+          "flags": []
+        }
+      ]
+    },
+    {
+      "name": "oyi::golden::Scratch",
+      "kind": "component",
+      "typeId": "0x11e4a96c05b55b05",
+      "size": 4,
+      "align": 4,
+      "flags": [
+        "ReadOnly",
+        "Transient"
+      ],
+      "layoutHash": "0x57425a6174024bd0",
+      "description": "Rebuilt every frame by a system",
+      "fields": [
+        {
+          "name": "mValue",
+          "type": "float",
+          "kind": "Float32",
+          "offset": 0,
+          "size": 4,
+          "count": 1,
+          "flags": [],
+          "default": 0.0
         }
       ]
     },

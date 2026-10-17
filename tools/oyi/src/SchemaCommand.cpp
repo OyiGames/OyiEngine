@@ -45,9 +45,19 @@ namespace {
 
 int RunSchema(std::span<const std::string_view> args) {
     Options options;
-    if (!ParseOptions(args, options) || !options.mNamed.empty() || options.mPositional.size() != 2 ||
-        options.mPositional[0] != "validate") {
-        std::fputs("usage: oyi schema validate <header.h> [--json]\n", stdout);
+    const bool parsed = ParseOptions(args, options) && options.mNamed.empty();
+    if (parsed && options.mPositional.size() == 1 && options.mPositional[0] == "dump") {
+        // The merged schema of this build; the same text with or without --json.
+        if (!options.mQuiet) {
+            const std::string_view json = GetBuildSchemaJson();
+            std::fwrite(json.data(), 1, json.size(), stdout);
+        }
+        return kExitOk;
+    }
+    if (!parsed || options.mPositional.size() != 2 || options.mPositional[0] != "validate") {
+        std::fputs("usage: oyi schema validate <header.h> [--json]\n"
+                   "       oyi schema dump [--json]\n",
+                   stdout);
         return kExitUsage;
     }
     const std::string codegenDir = Setting("OYI_CODEGEN_DIR", OYI_CODEGEN_DIR);

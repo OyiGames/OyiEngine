@@ -33,7 +33,9 @@ enum class FieldKind : uint8_t {
 enum class FieldFlags : uint8_t {
     None       = 0,
     Replicated = 1u << 0u,
-    Hidden     = 1u << 1u,
+    Hidden     = 1u << 1u, ///< not shown in inspectors
+    ReadOnly   = 1u << 2u, ///< owned by a system; tools display it but never write it
+    HasRange   = 1u << 3u, ///< mRangeMin / mRangeMax are meaningful
 };
 OYI_ENUM_FLAGS(FieldFlags);
 
@@ -43,6 +45,8 @@ enum class ComponentFlags : uint8_t {
     Replicated = 1u << 1u, ///< at least one field is replicated
     Chunk      = 1u << 2u, ///< one value per chunk instead of per entity
     Predicted  = 1u << 3u, ///< ADR-0017: takes part in client prediction (keeps an N-frame history)
+    Transient  = 1u << 4u, ///< ADR-0024: rebuilt at run time; saved as defaults, never replicated or predicted
+    ReadOnly   = 1u << 5u, ///< ADR-0024: derived by systems; tools display it but never write it
 };
 OYI_ENUM_FLAGS(ComponentFlags);
 
@@ -56,6 +60,13 @@ struct FieldInfo {
     FieldFlags mFlags = FieldFlags::None;
     TypeId mTypeId    = {};   ///< valid for Enum and Struct kinds
     float mQuantize   = 0.0f; ///< replication step; 0 means exact
+    // ADR-0024 tool-facing options; see tools/codegen/README.md.
+    double mRangeMin = 0.0;        ///< with HasRange: the smallest allowed value
+    double mRangeMax = 0.0;        ///< with HasRange: the largest allowed value
+    float mStep      = 0.0f;       ///< editing increment; 0 means unspecified
+    std::string_view mUnit;        ///< "m", "rad", "s", ...; empty when unspecified
+    std::string_view mAssetKind;   ///< for AssetId fields: the asset kind the reference must point at
+    std::string_view mDescription; ///< English, from the Description option
 };
 
 struct ComponentInfo {
@@ -71,6 +82,7 @@ struct ComponentInfo {
     /// A value-initialized instance (`T{}`), mSize bytes long: storage copies it to give new
     /// components their declared default member initializers without running a constructor.
     const void* mDefault = nullptr;
+    std::string_view mDescription; ///< English, from the Description option (ADR-0024)
 };
 
 /// Maps a reflected component type to its ComponentInfo. Specialized by tools/codegen for every

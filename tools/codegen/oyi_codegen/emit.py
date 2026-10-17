@@ -20,6 +20,26 @@ def _float_literal(value: float) -> str:
     return text + "f"
 
 
+def _double_literal(value: float) -> str:
+    text = repr(float(value))
+    if "e" in text or "E" in text:
+        text = f"{value:.17g}"
+    if "." not in text and "e" not in text and "E" not in text:
+        text += ".0"
+    return text
+
+
+def _string_literal(text: str) -> str:
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _field_flags(f: FieldDecl) -> list[str]:
+    flags = list(f.flags)
+    if f.range_min is not None and f.range_max is not None:
+        flags.append("HasRange")
+    return flags
+
+
 def _flags_expr(enum: str, flags: list[str]) -> str:
     if not flags:
         return f"{_CORE}{enum}::None"
@@ -31,8 +51,12 @@ def _field_initializer(f: FieldDecl) -> str:
         "{"
         f'.mName = "{f.name}", .mTypeName = "{f.type_name}", .mOffset = {f.offset}, .mSize = {f.size}, '
         f".mCount = {f.count}, .mKind = {_CORE}FieldKind::{f.kind.value}, "
-        f".mFlags = {_flags_expr('FieldFlags', f.flags)}, .mTypeId = {_CORE}TypeId{{.mValue = {f.type_id:#018x}ull}}, "
-        f".mQuantize = {_float_literal(f.quantize)}"
+        f".mFlags = {_flags_expr('FieldFlags', _field_flags(f))}, "
+        f".mTypeId = {_CORE}TypeId{{.mValue = {f.type_id:#018x}ull}}, "
+        f".mQuantize = {_float_literal(f.quantize)}, "
+        f".mRangeMin = {_double_literal(f.range_min or 0.0)}, .mRangeMax = {_double_literal(f.range_max or 0.0)}, "
+        f".mStep = {_float_literal(f.step)}, .mUnit = {_string_literal(f.unit)}, "
+        f".mAssetKind = {_string_literal(f.asset_kind)}, .mDescription = {_string_literal(f.description)}"
         "}"
     )
 
@@ -53,7 +77,8 @@ def _record_cpp(r: RecordDecl) -> list[str]:
         f"inline constexpr {_CORE}ComponentInfo {info_symbol}{{"
         f'.mName = "{r.qualified_name}", .mTypeId = {_CORE}TypeId{{.mValue = {r.type_id:#018x}ull}}, '
         f".mSize = {r.size}, .mAlign = {r.align}, .mFlags = {_flags_expr('ComponentFlags', r.flags)}, "
-        f".mFields = {fields_span}, .mLayoutHash = {r.layout_hash:#018x}ull, .mDefault = &{default_symbol}}};"
+        f".mFields = {fields_span}, .mLayoutHash = {r.layout_hash:#018x}ull, .mDefault = &{default_symbol}, "
+        f".mDescription = {_string_literal(r.description)}}};"
     )
     drift = f'"oyi_codegen: layout of {r.qualified_name} changed since generation; rebuild to regenerate"'
     lines.append(f"static_assert(sizeof({r.name}) == {r.size}, {drift});")
@@ -137,6 +162,21 @@ def render_json(schema: HeaderSchema) -> str:
             data["typeId"] = f"{f.type_id:#018x}"
         if f.quantize:
             data["quantize"] = f.quantize
+        if f.default is not None:
+            data["default"] = f.default
+        if f.enumerators is not None:
+            data["enumerators"] = f.enumerators
+            data["underlying"] = f.enum_underlying
+        if f.range_min is not None and f.range_max is not None:
+            data["range"] = [f.range_min, f.range_max]
+        if f.step:
+            data["step"] = f.step
+        if f.unit:
+            data["unit"] = f.unit
+        if f.asset_kind:
+            data["asset"] = f.asset_kind
+        if f.description:
+            data["description"] = f.description
         return data
 
     doc = {
@@ -152,6 +192,7 @@ def render_json(schema: HeaderSchema) -> str:
                 "align": r.align,
                 "flags": r.flags,
                 "layoutHash": f"{r.layout_hash:#018x}",
+                **({"description": r.description} if r.description else {}),
                 "fields": [field_json(f) for f in r.fields],
             }
             for r in schema.records
