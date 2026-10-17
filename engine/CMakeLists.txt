@@ -1,6 +1,6 @@
 # Modules in dependency order. Dependencies only point downwards (ADR-0003):
 #   platform <- core <- job <- ecs <- transform <- script / physics / net (net needs ecs only)
-#   object sits beside transform: the object layer of ADR-0024 needs ecs only.
+#   object sits beside transform: the object layer of ADR-0024 needs ecs and asset.
 #   asset sits beside job: it needs core only; rpc needs core and platform.
 add_subdirectory(oyi_platform)
 add_subdirectory(oyi_core)

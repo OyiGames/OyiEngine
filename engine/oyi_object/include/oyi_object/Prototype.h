@@ -1,5 +1,6 @@
 #pragma once
 
+#include <oyi_asset/Blob.h>
 #include <oyi_core/Allocator.h>
 #include <oyi_core/Expected.h>
 #include <oyi_core/MemoryResource.h>
@@ -77,6 +78,12 @@ public:
     /// binding that does not fit the mask, and with the world's error when it cannot create the
     /// prototype entity. Registers every managed type with the world's managed type registry.
     [[nodiscard]] core::Expected<PrototypeId> Register(const PrototypeDesc& desc) noexcept;
+    /// Registers the tree of a prototype blob (PrototypeBlob.h; open it with
+    /// PrototypeBlobExpectation) and returns its root. Types are resolved against the world:
+    /// a component or managed type it does not know fails with NotFound (register managed
+    /// types first), a malformed tree with CorruptData. What was registered before a failure
+    /// stays registered.
+    [[nodiscard]] core::Expected<PrototypeId> Load(const asset::BlobView& blob) noexcept;
 
     [[nodiscard]] PrototypeId Find(std::string_view name) const noexcept;
     [[nodiscard]] bool IsRegistered(PrototypeId id) const noexcept {
@@ -87,6 +94,10 @@ public:
 
 private:
     [[nodiscard]] core::Expected<PrototypeId> RegisterNode(const PrototypeDesc& desc, PrototypeId parent) noexcept;
+    /// One prototype without its children.
+    [[nodiscard]] core::Expected<PrototypeId> RegisterOne(const PrototypeDesc& desc, PrototypeId parent) noexcept;
+    [[nodiscard]] core::Expected<PrototypeId> LoadNode(const asset::BlobView& blob, uint32_t index, PrototypeId parent,
+                                                       std::pmr::vector<uint8_t>& visited) noexcept;
 
     core::Allocator& mAllocator;
     ecs::World& mWorld;
